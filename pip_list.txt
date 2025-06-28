@@ -1,0 +1,1 @@
+discord python-dotenv PyNaCl yt-dlp requests google-api-python-client motor pymongo
