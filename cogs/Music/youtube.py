@@ -558,10 +558,17 @@ class Function():
                 client = guild_data.get("client")
                 if not client: break
 
-                # --- START: CORE LOGIC FIX ---
-                # The primary loop condition is gone. We now check the state inside.
-                # If the song is not playing AND it's not paused, it means the song
-                # has finished naturally. The loop for this track is over.
+
+                human_members = [member for member in client.channel.members if not member.bot]
+
+                # If the list is empty, it means only the bot is left
+                if len(human_members) == 0:
+                    logger.info(f"No human users left in voice channel for guild {guild_id}. Stopping playback.")
+                    # Call the main stop function which handles cleanup and disconnection
+                    await Function._stop(Function, guild_id)
+                    # Break the loop immediately since the session is being terminated
+                    break
+
                 if not client.is_playing() and not client.is_paused():
                     break
                 
@@ -570,9 +577,7 @@ class Function():
                 if client.is_paused():
                     await asyncio.sleep(1)
                     continue
-                # --- END: CORE LOGIC FIX ---
 
-                # If we reach here, it means the client is actively playing.
                 embed_msg = guild_data.get("embed_msg")
                 embed = guild_data.get("embed")
 
@@ -584,7 +589,7 @@ class Function():
                         try:
                             await embed_msg.edit(embed=embed, view=view)
                         except discord.NotFound:
-                            break # Stop trying if the message was deleted
+                            break
                 
                 # Wait for the next update cycle
                 await asyncio.sleep(5)
