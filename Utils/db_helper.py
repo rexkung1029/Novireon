@@ -1,18 +1,17 @@
+# your_bot_project/Utils/db_helper.py
 import os
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient # 異步 MongoDB 驅動
+from motor.motor_asyncio import AsyncIOMotorClient
 import logging
 
 _log = logging.getLogger(__name__)
 
-# 載入環境變數
 load_dotenv()
 MONGO_URI = os.getenv('MONGO_URI')
 
-
-# 推薦使用異步驅動 motor，因為 discord.py 是異步的
 client: AsyncIOMotorClient = None
-db = None
+db = None # 確保初始化為 None
+
 async def connect_to_mongo():
     """連接到 MongoDB 並獲取資料庫實例。"""
     global client, db
@@ -22,10 +21,7 @@ async def connect_to_mongo():
 
     try:
         client = AsyncIOMotorClient(MONGO_URI)
-        # 這裡 'your_bot_db' 是你的資料庫名稱
-        db = client.get_database('your_bot_db') 
-        
-        # 嘗試列出集合，以測試連接是否成功
+        db = client.get_database('Novireon_Bot_DB') 
         await db.list_collection_names() 
         _log.info("Successfully connected to MongoDB!")
         return db
@@ -40,9 +36,14 @@ async def close_mongo_connection():
         client.close()
         _log.info("MongoDB connection closed.")
 
+def get_db():
+    """返回 MongoDB 資料庫實例。"""
+    return db
+
 def get_collection(collection_name: str):
     """獲取指定名稱的集合。"""
-    if db:
+    # 這裡就是需要修改的地方
+    if db is not None: # 將 if db: 改為 if db is not None:
         return db[collection_name]
     else:
         _log.error("MongoDB is not connected. Cannot get collection.")

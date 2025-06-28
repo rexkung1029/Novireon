@@ -3,7 +3,7 @@ from discord.ext import commands
 import os
 from dotenv import load_dotenv
 import logging
-import Util
+import Utils
 
 # 載入環境變數
 load_dotenv()
@@ -55,7 +55,7 @@ async def on_ready():
     _log.info('---------------------------------------------')
     await load_cogs(bot)
     _log.info('All cogs loading process completed.')
-    await Util.db_helper.connect_to_mongo()
+    await Utils.db_helper.connect_to_mongo()
     _log.info("Syncing...")
     await bot.tree.sync()
     _log.info("Synced!")
@@ -64,14 +64,14 @@ async def on_ready():
 async def on_disconnect():
     _log.info("Bot disconnected.")
     # 在 Bot 斷開連接時關閉 MongoDB 連接
-    await Util.db_helper.close_mongo_connection()
+    await Utils.db_helper.close_mongo_connection()
 
 @bot.event
 async def on_connect():
     _log.info("Bot reconnected.")
     # 如果斷線重連，確保 MongoDB 連接仍然存在或重新連接
-    if not Util.db_helper.db:
-        await Util.db_helper.connect_to_mongo()
+    if not Utils.db_helper.db:
+        await Utils.db_helper.connect_to_mongo()
 
 # 執行 Bot
 if TOKEN:
