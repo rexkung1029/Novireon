@@ -1,26 +1,27 @@
 import discord
-from discord.ext import commands
-from discord import app_commands
 import logging
+import os
 
-from pymongo import MongoClient
-from mongo_crud import MongoCRUD
-from . import music_utils
+from discord     import app_commands
+from discord.ext import commands
+from pymongo     import MongoClient
+from mongo_crud  import MongoCRUD
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Music_Core")
 
-mongo_uri = "mongodb://localhost:27017/"
+mongo_uri = os.getenv("MONGO_URI")
 mongo_client = MongoClient(
-    "mongodb://localhost:27017/",
+    mongo_uri,
     serverSelectionTimeoutMS=15000
 )
+
 db_handler = MongoCRUD(
-            client=mongo_client, 
-            db_name='Norvireon_bot_db', 
-            collection_name='Music_data',
-            logger=logger
-        )
+    client=mongo_client, 
+    db_name='Norvireon_bot_db', 
+    collection_name='Music_data',
+    logger=logger
+)
 
 class MusicSetup(commands.Cog):
     def __init__(self, bot: commands.Bot):

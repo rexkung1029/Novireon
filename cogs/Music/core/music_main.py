@@ -1,20 +1,22 @@
+import asyncio
 import discord 
 import logging
+import music_utils
 import time
-import asyncio
 
+from discord     import app_commands
+from discord     import Interaction as Itat
+from discord     import VoiceClient as VC
 from discord.ext import commands
-from discord.ui import View
-from discord import app_commands
-from discord import Interaction as Itat
-from discord import VoiceClient as VC
-from pymongo import MongoClient
+from discord.ui  import View
+from pymongo     import MongoClient
 
-from ..youtube import Youtube
-from .music_data import voice_data
-from mongo_crud import MongoCRUD
+from mongo_crud       import MongoCRUD
+from .music_checkers  import Checkers
+from .music_data      import voice_data
 from .music_functions import Functions
-from . import music_utils
+from ..youtube        import Youtube
+
 
 
 logging.basicConfig(level=logging.INFO)
@@ -38,40 +40,6 @@ db_handler = MongoCRUD(
     logger=logger
 )
 
-class Checks():
-    @staticmethod
-    def is_in_valid_voice_channel():
-        """檢查使用者是否與機器人在同一個語音頻道。"""
-        def predicate(itat:Itat) -> bool:
-            guild_id = itat.guild_id
-            if guild_id not in voice_data: return True
-            client:VC = voice_data[guild_id]["client"]
-            if itat.guild.voice_client is None:
-                return True
-            if itat.user.voice is None:
-                return False
-            return itat.user.voice.channel.id == client.channel.id
-        return app_commands.check(predicate)
-    
-    @staticmethod
-    def is_dj():
-        def predicate(itat:Itat) -> bool:
-            guild_id = itat.guild_id
-            settings = db_handler.get(query={"_id":guild_id})[0]
-            dj_role_id = settings.get('dj_role_id', None)
-
-            if itat.user.guild_permissions.administrator :return True
-            
-            elif dj_role_id is not None:
-                if_dj = False
-                for role in itat.user.roles :
-                    if role.id == dj_role_id : if_dj = True
-                return if_dj
-            
-            elif dj_role_id is None :return False
-        return app_commands.check(predicate)
-
-
 class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -79,7 +47,7 @@ class Music(commands.Cog):
  
     @app_commands.command(name="play", description="播放音樂")
     @app_commands.describe(request="可使用網址或直接搜尋")
-    @Checks.is_in_valid_voice_channel()
+    @Checkers.is_in_valid_voice_channel()
     async def command_play(self, itat:Itat, request:str):
         try:
             await itat.response.send_message("處理中", ephemeral=True)
@@ -134,32 +102,32 @@ class Music(commands.Cog):
             logger.error(f"Command_play Error {e}")
 
     @app_commands.command(name="stop", description="停止播放音樂")
-    @Checks.is_dj()
-    @Checks.is_in_valid_voice_channel()
+    @Checkers.is_dj()
+    @Checkers.is_in_valid_voice_channel()
     async def command_stop(self, itat:Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id
         await Functions._stop(guild_id)
 
     @app_commands.command(name="skip", description="跳過當前曲目")
-    @Checks.is_dj()
-    @Checks.is_in_valid_voice_channel()
+    @Checkers.is_dj()
+    @Checkers.is_in_valid_voice_channel()
     async def command_skip(self, itat:Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id
         await Functions._skip(guild_id)
 
     @app_commands.command(name="pause", description="暫停音樂")
-    @Checks.is_dj()
-    @Checks.is_in_valid_voice_channel()
+    @Checkers.is_dj()
+    @Checkers.is_in_valid_voice_channel()
     async def command_pause(self, itat:Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id
         await Functions._pause(guild_id)    
 
     @app_commands.command(name="resume", description="繼續播放")
-    @Checks.is_dj()
-    @Checks.is_in_valid_voice_channel()
+    @Checkers.is_dj()
+    @Checkers.is_in_valid_voice_channel()
     async def command_resume(self, itat:Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id

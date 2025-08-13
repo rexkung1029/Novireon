@@ -6,12 +6,14 @@ import yt_dlp
 
 from googleapiclient.discovery import build
 
+YOUTUBE_API_KEY = os.getenv("GOOGLE")
+
 youtube_base_url = 'https://www.youtube.com/'
 youtube_watch_url = youtube_base_url + 'watch?v='
 yt_dl_options = {"format": "bestaudio/best"}
 ytdl = yt_dlp.YoutubeDL(yt_dl_options)
-YOUTUBE_API_KEY = os.getenv("GOOGLE")
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Youtube_Itat_Re")
 

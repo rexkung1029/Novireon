@@ -1,19 +1,20 @@
 import discord 
 import logging
+import os
 
-from discord import ButtonStyle
+from discord    import ButtonStyle
 from discord.ui import Button
-from pymongo import MongoClient
+from pymongo    import MongoClient
 
-from mongo_crud import MongoCRUD
+from mongo_crud        import MongoCRUD
 from ..music_functions import Functions
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Music_Core")
 
-mongo_uri = "mongodb://localhost:27017/"
+mongo_uri = os.getenv("MONGO_URI")
 mongo_client = MongoClient(
-    "mongodb://localhost:27017/",
+    mongo_uri,
     serverSelectionTimeoutMS=15000
 )
 

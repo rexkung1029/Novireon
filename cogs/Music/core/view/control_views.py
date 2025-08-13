@@ -1,7 +1,5 @@
 import discord
 
-
-
 class ControlView(discord.ui.View):
     def __init__(self, guild_id: int):
         super().__init__(timeout=None) # Timeout=None is crucial so the buttons don't expire

@@ -4,14 +4,14 @@ import time
 import asyncio
 
 from discord.ui import View
-from discord import Interaction as Itat
-from discord import VoiceClient as VC
-from pymongo import MongoClient
+from discord    import Interaction as Itat
+from discord    import VoiceClient as VC
+from pymongo    import MongoClient
 
-from . import music_utils
-from ..youtube import Youtube
-from mongo_crud import MongoCRUD
-from .music_data import voice_data
+from .                   import music_utils
+from ..youtube           import Youtube
+from mongo_crud          import MongoCRUD
+from .music_data         import voice_data
 from .view.control_views import ControlView
 
 

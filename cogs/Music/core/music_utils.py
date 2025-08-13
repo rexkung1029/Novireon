@@ -3,11 +3,11 @@ import logging
 import time
 import urllib.parse
 
-from discord import Interaction as Itat
-from discord.ext import commands
+from discord       import Interaction as Itat
+from discord.ext   import commands
 from discord.utils import get
-from mongo_crud import MongoCRUD
-from pymongo import MongoClient
+from mongo_crud    import MongoCRUD
+from pymongo       import MongoClient
 
 
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +35,8 @@ db_handler = MongoCRUD(
 
 def format_time(seconds):
     mins, secs = divmod(int(seconds), 60)
-    return f"{mins}:{secs:02}"
+    hours, mins = divmod(int(mins), 60)
+    return f"{hours}:{mins:02}:{secs:02}" if hours > 0 else f"{mins}:{secs:02}"
 
 def generate_progress_bar(guild_id):
     data = db_handler.get(query= {'_id':guild_id})[0]
@@ -45,7 +46,8 @@ def generate_progress_bar(guild_id):
     total_paused_duration = data['total_paused_duration']
     author = data.get('author', 'Unknown Artist')
     if duration == 0: return ""
-    if total_paused_duration is None: total_paused_duration = 0
+    if total_paused_duration is None: 
+        total_paused_duration = 0
 
     if not is_playing:
         pause_time = data.get("pause_time", start_time)
@@ -61,42 +63,12 @@ def generate_progress_bar(guild_id):
     else         : return f"已暫停\n`[{bar}]` `({format_time(elapsed)}/{format_time(duration)})`"
 
 def get_source_name(url):
-    """
-    從 URL 中提取網站名稱。
-
-    Args:
-    url: 要從中提取網站名稱的 URL。
-
-    Returns:
-    網站名稱
-    """
     hostname = urllib.parse.urlparse(url).hostname
     if hostname:
         if "youtube.com" or "youtu.be" in hostname:
             return "youtube"
     return ""
 
-def has_role(role_id):
-    """
-    一個 discord.py 的檢查裝飾器，用來驗證使用者是否擁有指定的身分組。
-    可以傳入身分組的名稱 (str) 或 ID (int)。
-    """
-    async def predicate(itat:Itat) -> bool:
-        # 如果指令在私訊中使用，直接返回 False，因為私訊中沒有身分組
-        if itat.guild is None:
-            return False
-        
-        if itat.user.guild_permissions.administrator:
-            return True
-        
-        required_role = itat.guild.get_role(role_id)
-
-        if required_role is None or itat.user.bot:
-            return False
-        
-        return required_role in itat.user.roles
-
-    return commands.check(predicate)
 
 def is_valid_url(url):
     """
