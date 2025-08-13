@@ -1,14 +1,12 @@
-import asyncio
 import discord 
 import logging
 import music_utils
-import time
+import os
 
 from discord     import app_commands
 from discord     import Interaction as Itat
 from discord     import VoiceClient as VC
 from discord.ext import commands
-from discord.ui  import View
 from pymongo     import MongoClient
 
 from mongo_crud       import MongoCRUD
@@ -27,9 +25,9 @@ ffmpeg_options = {
     'options': '-vn -filter:a "volume=0.3"'
 }
 
-mongo_uri = "mongodb://localhost:27017/"
+mongo_uri = os.getenv("MONGO_URI")
 mongo_client = MongoClient(
-    "mongodb://localhost:27017/",
+    mongo_uri,
     serverSelectionTimeoutMS=15000
 )
 
