@@ -5,9 +5,7 @@ def setup_logging():
     """設定應用程式的日誌記錄器"""
     
     # 創建一個格式化器
-    log_format = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    log_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     # 獲取根記錄器 (root logger)
     root_logger = logging.getLogger()

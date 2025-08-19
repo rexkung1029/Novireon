@@ -17,7 +17,7 @@ from .view.control_views import ControlView
 
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Music_Core")
+logger = logging.getLogger("Music_Function")
 
 ffmpeg_options = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',

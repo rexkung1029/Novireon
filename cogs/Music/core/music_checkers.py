@@ -10,7 +10,7 @@ from .music_data import voice_data
 from mongo_crud  import MongoCRUD
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Music_Core")
+logger = logging.getLogger("Music_Checkers")
 
 
 mongo_uri = os.getenv("MONGO_URI")

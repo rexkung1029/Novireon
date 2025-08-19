@@ -15,7 +15,7 @@ ytdl = yt_dlp.YoutubeDL(yt_dl_options)
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Youtube_Itat_Re")
+logger = logging.getLogger("Youtube")
 
 class Youtube:
     async def get_data(request):

@@ -11,7 +11,7 @@ from pymongo       import MongoClient
 
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Music_Core")
+logger = logging.getLogger("Music_Utils")
 
 mongo_client = MongoClient(
     "mongodb://localhost:27017/",

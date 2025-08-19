@@ -8,7 +8,7 @@ from pymongo     import MongoClient
 from mongo_crud  import MongoCRUD
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Music_Core")
+logger = logging.getLogger("Music_Setup")
 
 mongo_uri = os.getenv("MONGO_URI")
 mongo_client = MongoClient(
