@@ -111,7 +111,7 @@ class Functions():
                 upsert=True
             )
 
-            voice_data[guild_id]['progress_task'] = asyncio.create_task(Functions.playback_status_updater(guild_id))
+            voice_data[guild_id]['progress_task'] = asyncio.create_task(Functions.playback_state_updater(guild_id))
         except Exception as e:
             await voice_data[guild_id]["music_channel"].send("無法播放，請使用連結或再試一次", delete_after=10)
             logger.error(f"_play error: {e}")
@@ -248,7 +248,7 @@ class Functions():
             logger.error(f"search error: {e}")
             await itat.followup.send("搜尋時發生錯誤，請使用有效連結或再試一次。", ephemeral=True)
 
-    async def playback_status_updater(guild_id):
+    async def playback_state_updater(guild_id):
         try:
             while guild_id in voice_data:
                 if "client" not in voice_data[guild_id]:break
