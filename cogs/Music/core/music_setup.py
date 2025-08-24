@@ -33,51 +33,45 @@ class MusicSetup(commands.Cog):
         guild_only=True
     )
 
-    @music_setup.command(name="channel", description="Set the channel where music commands can be used.")
-    @app_commands.describe(channel="The text channel to allow music commands in. Leave blank to allow all channels.")
+    @music_setup.command(name="channel", description="設定哪個語音頻道可以使用音樂指令。")
+    @app_commands.describe(channel="用於發送指令的文字頻道ID，留白則允許所有頻道。")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_music_channel(self, itat: discord.Interaction, channel: discord.TextChannel = None):
-        """Sets the designated music command channel."""
-        guild_id = itat.guild_id
-        
         if channel:
             db_handler.update_one(
                 query={},
                 new_values={"music_channel_id": channel.id},
                 upsert=True
-                )
-            await itat.response.send_message(f"Music commands are now restricted to {channel.mention}.", ephemeral=True)
+            )
+            await itat.response.send_message(f"已設定{channel.mention}作為音樂指令頻道。", ephemeral=True)
         else:
             # If no channel is provided, remove the restriction
             db_handler.update_one(
                 query={},
                 new_values={"music_channel_id": None},
                 upsert=True
-                )
-            await itat.response.send_message("Music commands can now be used in any channel.", ephemeral=True)
+            )
+            await itat.response.send_message("音樂指令已在所有頻道允許", ephemeral=True)
 
-    @music_setup.command(name="dj_role", description="Set the role that is allowed to control the music player.")
-    @app_commands.describe(role="The role to be designated as 'DJ'. Leave blank to remove the DJ role.")
+    @music_setup.command(name="dj_role", description="使定可控制音樂播放的身分組")
+    @app_commands.describe(role="被指定為'DJ'的身分組。留白則僅管理員可控制。")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_dj_role(self, itat: discord.Interaction, role: discord.Role = None):
-        """Sets or removes the DJ role."""
-        guild_id = itat.guild_id
-        
         if role:
             db_handler.update_one(
                 query={},
                 new_values={"dj_role_id": role.id},
                 upsert=True
-                )
-            await itat.response.send_message(f"The `{role.name}` role is now the DJ role.", ephemeral=True)
+            )
+            await itat.response.send_message(f"`{role.name}` 已被設為'DJ'的身分組。", ephemeral=True)
         else:
             # If no role is provided, remove the DJ role
             db_handler.update_one(
                 query={},
                 new_values={"dj_role_id": None},
                 upsert=True
-                )
-            await itat.response.send_message("DJ role has been removed. Only Admins can control the bot now.", ephemeral=True)
+            )
+            await itat.response.send_message("DJ身分組已被移除，僅管理員可控制音樂播放。", ephemeral=True)
 
     @set_music_channel.error
     @set_dj_role.error

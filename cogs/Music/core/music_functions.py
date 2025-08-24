@@ -258,7 +258,7 @@ class Functions():
                 human_members = [member for member in client.channel.members if not member.bot]
 
                 if len(human_members) == 0:
-                    logger.info(f"No human users left in voice channel for guild {guild_id}. Stopping playback.")
+                    logger.info(f"No users left in voice channel for guild {guild_id}. Stopping playback.")
                     await Functions._stop(guild_id)
                     break
 

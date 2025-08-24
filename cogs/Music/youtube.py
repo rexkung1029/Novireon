@@ -32,16 +32,6 @@ class Youtube:
         return data
 
     def get_youtube_video_id(url: str) -> str | None:
-        """
-        從各種格式的 YouTube 網址中提取 Video ID。
-
-        Args:
-            url: YouTube 網址字串。
-
-        Returns:
-            如果成功提取，則回傳 11 個字元的 Video ID 字串。
-            如果找不到或格式不符，則回傳 None。
-        """
         if not isinstance(url, str):
             return None
             

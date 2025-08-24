@@ -1,6 +1,5 @@
 import discord 
 import logging
-import music_utils
 import os
 
 from discord     import app_commands
@@ -10,9 +9,11 @@ from discord.ext import commands
 from pymongo     import MongoClient
 
 from mongo_crud       import MongoCRUD
+from .                import music_utils
 from .music_checkers  import Checkers
 from .music_data      import voice_data
 from .music_functions import Functions
+from ..monster_siren  import Monster_siren
 from ..youtube        import Youtube
 
 
@@ -51,7 +52,7 @@ class Music(commands.Cog):
             await itat.response.send_message("處理中", ephemeral=True)
 
             if itat.user.voice is None:
-                await itat.followup.send("❌ 您必須先加入一個語音頻道才能使用此指令！",ephemeral=True, delete_after=5)
+                await itat.followup.send("您必須先加入一個語音頻道才能使用此指令！",ephemeral=True, delete_after=5)
                 return
 
             guild_id = itat.guild_id
@@ -62,7 +63,7 @@ class Music(commands.Cog):
             else:
                 voice_client:VC = voice_data[guild_id]["client"]
                 if itat.user.voice.channel.id != voice_client.channel.id:
-                    await itat.followup.send("❌ 您必須先加入與機器人相同語音頻道才能使用此指令！",ephemeral=True, delete_after=5)
+                    await itat.followup.send("您必須先加入與機器人相同語音頻道才能使用此指令！",ephemeral=True, delete_after=5)
                     return
 
             voice_data[guild_id]["music_channel"]=itat.channel
@@ -71,6 +72,13 @@ class Music(commands.Cog):
             match music_utils.get_source_name(request):
                 case "youtube":
                     data = await Youtube.get_data(request)
+                    db_handler.append(
+                        query={"_id":guild_id},
+                        field="queue",
+                        value=data
+                    )
+                case "monster_siren":
+                    data = Monster_siren.get_song_data(request)
                     db_handler.append(
                         query={"_id":guild_id},
                         field="queue",

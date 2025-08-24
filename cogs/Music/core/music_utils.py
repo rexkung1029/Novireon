@@ -67,19 +67,12 @@ def get_source_name(url):
     if hostname:
         if "youtube.com" or "youtu.be" in hostname:
             return "youtube"
+        if "monster-siren.hypergryph.com" in hostname:
+            return "monster_siren"
     return ""
 
 
 def is_valid_url(url):
-    """
-    檢查給定的字串是否為有效的 URL。
-
-    Args:
-    url: 要檢查的字串。
-
-    Returns:
-    如果字串是有效的 URL，則返回 True，否則返回 False。
-    """
     try:
         result = urllib.parse.urlparse(url)
         return all([result.scheme, result.netloc])
