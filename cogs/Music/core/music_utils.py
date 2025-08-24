@@ -63,9 +63,12 @@ def generate_progress_bar(guild_id):
     else         : return f"已暫停\n`[{bar}]` `({format_time(elapsed)}/{format_time(duration)})`"
 
 def get_source_name(url):
+    if not isinstance(url, str):
+        return ""
     hostname = urllib.parse.urlparse(url).hostname
+    print(hostname)
     if hostname:
-        if "youtube.com" or "youtu.be" in hostname:
+        if "youtube.com" in hostname or "youtu.be" in hostname:
             return "youtube"
         if "monster-siren.hypergryph.com" in hostname:
             return "monster_siren"

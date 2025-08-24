@@ -11,21 +11,26 @@ logger = logging.getLogger("monster_siren")
 
 class Monster_siren:
     def get_song_data(url:str):
-        cid = url.split("/")[-1]
-        song_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/song/{cid}',)
-        album_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/album/{int(raw_song_data['albumCid'])}/detail')
-        raw_song_data = json.loads(song_response.text)['data']
-        raw_album_data =json.loads(album_response.text)['data']
-        duration = get_wav_duration_robust(raw_song_data['sourceUrl'])
-        data={
-            "author":raw_song_data.get('artists')[0],
-            "duration" : int(duration),
-            "song_url" : raw_song_data['sourceUrl'],
-            "title" : raw_song_data['name'],
-            "thumbnail" : raw_album_data.get('coverUrl', '')
-        }
-        return data
-    
+        try:
+            cid = url.split("/")[-1]
+            logger.info(f"find data from Monster Siren, cid={cid}")
+            song_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/song/{cid}',)
+            raw_song_data = json.loads(song_response.text)['data']
+            album_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/album/{int(raw_song_data['albumCid'])}/detail')
+            raw_album_data =json.loads(album_response.text)['data']
+            duration = get_wav_duration_robust(raw_song_data['sourceUrl'])
+            data={
+                "author":raw_song_data.get('artists')[0],
+                "duration" : int(duration),
+                "song_url" : raw_song_data['sourceUrl'],
+                "title" : raw_song_data['name'],
+                "thumbnail" : raw_album_data.get('coverUrl', '')
+            }
+            return data
+        except Exception as e:
+            logger.error("無法從MSR獲取歌曲資訊")
+            logger.error(e)
+
 def parse_wav_bytes(wav_bytes):
     in_memory_file = io.BytesIO(wav_bytes)
     with closing(wave.open(in_memory_file, 'rb')) as wf:

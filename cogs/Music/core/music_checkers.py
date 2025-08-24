@@ -33,6 +33,7 @@ class Checkers():
         if itat.user.voice is None:
             return False
         if guild_id not in voice_data: return True
+        if "client" not in voice_data[guild_id]: return True
         client:VC = voice_data[guild_id]["client"]
         if itat.guild.voice_client is None:
             return True
