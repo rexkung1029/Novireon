@@ -1,88 +1,115 @@
 import io
 import json
 import logging
+import os
 import requests
-import wave
-
-from contextlib import closing
+from urllib.parse import urlparse
+from pydub import AudioSegment
+import soundfile as sf
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("monster_siren")
 
 class Monster_siren:
-    def get_song_data(url:str):
+    def get_song_data(page_url: str):
         try:
-            cid = url.split("/")[-1]
-            logger.info(f"find data from Monster Siren, cid={cid}")
-            song_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/song/{cid}',)
-            raw_song_data = json.loads(song_response.text)['data']
-            album_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/album/{int(raw_song_data['albumCid'])}/detail')
-            raw_album_data =json.loads(album_response.text)['data']
-            duration = get_wav_duration_robust(raw_song_data['sourceUrl'])
-            data={
-                "author":raw_song_data.get('artists')[0],
-                "duration" : int(duration),
-                "song_url" : raw_song_data['sourceUrl'],
-                "title" : raw_song_data['name'],
-                "thumbnail" : raw_album_data.get('coverUrl', '')
+            logger.info(f"正在從頁面 URL 獲取歌曲資訊...")
+            cid = page_url.split("/")[-1]
+            
+            song_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/song/{cid}')
+            song_response.raise_for_status()
+            raw_song_data = song_response.json()['data']
+
+            album_cid = raw_song_data.get('albumCid')
+            if not album_cid: raise ValueError("API 回應中未找到專輯 ID (albumCid)")
+                
+            album_response = requests.get(url=f'https://monster-siren.hypergryph.com/api/album/{album_cid}/detail')
+            album_response.raise_for_status()
+            raw_album_data = album_response.json()['data']
+            logger.info("成功獲取 API 元數據！")
+
+            audio_url = raw_song_data.get('sourceUrl')
+            calculated_duration = None
+            if audio_url:
+                calculated_duration = calculate_duration_from_audio_url(audio_url)
+            else:
+                logger.warning("API 回應中未提供音檔 URL (sourceUrl)。")
+
+            data = {
+                "title": raw_song_data.get('name', 'N/A'),
+                "author": ", ".join(raw_song_data.get('artists', ['N/A'])),
+                "duration": calculated_duration,
+                "song_url": audio_url,
+                "thumbnail_url": raw_album_data.get('coverUrl', '')
             }
             return data
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API 請求失敗: {e}")
+        except (KeyError, json.JSONDecodeError):
+            logger.error("解析 API 回應失敗，可能是無效的 URL 或 API 結構已變更。")
         except Exception as e:
-            logger.error("無法從MSR獲取歌曲資訊")
-            logger.error(e)
+            # 使用 exc_info=True 可以自動附上完整的錯誤追蹤訊息，非常適合除錯
+            logger.error(f"發生非預期錯誤: {e}", exc_info=True)
+        return None
 
-def parse_wav_bytes(wav_bytes):
-    in_memory_file = io.BytesIO(wav_bytes)
-    with closing(wave.open(in_memory_file, 'rb')) as wf:
-        n_frames = wf.getnframes()
-        frame_rate = wf.getframerate()
-        return n_frames / float(frame_rate)
+def calculate_duration_from_audio_url(audio_url: str, timeout=15):
+    """
+    智能分析音檔時長。
+    - 如果是 WAV 檔，優先使用 HEAD 和 Range 請求結合標頭解析來計算總時長。
+    - 如果是其他格式或高效模式失敗，則降級為完整下載並用 pydub 解析。
+    """
+    logger.info(f"開始分析 URL: {audio_url[:50]}...")
+    
+    path = urlparse(audio_url).path
+    file_extension = os.path.splitext(path)[1].strip('.').lower()
+    
+    # --- 策略一：針對 WAV 檔案的超高效路徑 ---
+    if file_extension == 'wav':
+        try:
+            logger.info("偵測到 WAV 檔案，嘗試部份下載模式...")
+            
+            head_response = requests.head(audio_url, timeout=timeout)
+            head_response.raise_for_status()
+            content_length = int(head_response.headers['Content-Length'])
 
+            headers = {'Range': 'bytes=0-1023'}
+            range_response = requests.get(audio_url, headers=headers, timeout=timeout)
+            range_response.raise_for_status()
 
-def get_wav_duration_robust(url, timeout=15):
-    try:
-        headers = {'Range': 'bytes=0-10000'} # 請求 10000 bytes
-        logger.debug("階段一：嘗試以最高效率模式 (僅下載標頭)...")
-        response = requests.get(url, headers=headers, timeout=timeout)
-        response.raise_for_status()
+            with sf.SoundFile(io.BytesIO(range_response.content)) as audio_file:
+                samplerate = audio_file.samplerate
+                channels = audio_file.channels
+                subtype = audio_file.subtype
+                if 'PCM_16' in subtype: bits_per_sample = 16
+                elif 'PCM_24' in subtype: bits_per_sample = 24
+                elif 'PCM_32' in subtype: bits_per_sample = 32
+                elif 'FLOAT' in subtype: bits_per_sample = 32
+                else: raise ValueError(f"未知的 WAV subtype: {subtype}")
 
-        if response.status_code == 206:
-            logger.debug("伺服器支援部分下載，正在解析標頭...")
-            try:
-                duration = parse_wav_bytes(response.content)
-                logger.debug("成功從標頭解析出時長！")
+                byte_rate = samplerate * channels * (bits_per_sample / 8)
+                if byte_rate == 0: raise ValueError("計算出的位元率為 0")
+                
+                header_approx_size = 100 
+                duration = (content_length - header_approx_size) / byte_rate
+                
+                logger.info("成功使用部份下載模式計算出時長！")
                 return duration
-            except wave.Error:
-                logger.error("警告：部分標頭不足以解析，將自動降級為完整下載。")
+        except Exception as e:
+            logger.warning(f"部份下載失敗 ({type(e).__name__}: {e})，將降級為完整下載。")
 
-        elif response.status_code == 200:
-            logger.debug("伺服器不支援部分下載，但已回傳完整檔案。")
-            duration = parse_wav_bytes(response.content)
-            return duration
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"網路錯誤，無法完成請求: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"發生非預期錯誤: {e}")
-        return None
-
+    # --- 策略二：針對 MP3 或其他格式，以及失敗的 WAV 的可靠路徑 ---
     try:
-        logger.debug("\n階段二：執行標準模式 (完整下載)...")
-        full_response = requests.get(url, timeout=timeout*2)
+        logger.info("執行標準模式 (完整下載)...")
+        full_response = requests.get(audio_url, timeout=timeout * 2)
         full_response.raise_for_status()
+
+        if not file_extension: raise ValueError("無法從 URL 判斷檔案格式")
         
-        duration = parse_wav_bytes(full_response.content)
-        logger.debug("成功從完整檔案中解析出時長！")
-        return duration
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"網路錯誤，完整下載失敗: {e}")
-        return None
-    except wave.Error as e:
-        logger.error(f"檔案格式錯誤，無法解析此 WAV 檔案: {e}")
-        return None
+        audio_bytes = io.BytesIO(full_response.content)
+        audio = AudioSegment.from_file(audio_bytes, format=file_extension)
+        
+        logger.info("成功從完整檔案中解析出時長！")
+        return audio.duration_seconds
     except Exception as e:
-        logger.error(f"發生非預期錯誤: {e}")
+        logger.error(f"完整下載解析失敗: {e}")
         return None
-

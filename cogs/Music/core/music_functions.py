@@ -167,7 +167,7 @@ class Functions():
         if client.is_connected():
             await client.disconnect(force=True)
             await voice_data[guild_id]["music_channel"].send("已停止並斷開連接")
-        asyncio.sleep(1)
+        await asyncio.sleep(1)
         if guild_id in voice_data:
             del voice_data[guild_id]
 
