@@ -7,7 +7,8 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 import requests
 
-INPUT_IMAGE_FILE = r"https://pbs.twimg.com/media/G0D2RkNaMAAh8zc?format=jpg&name=small"
+from config import DISCORD_DEFAULT_AVATAR, FONT_PATH
+
 CANVAS_WIDTH, CANVAS_HEIGHT = 1280, 720  # 圖片寬度, 高度
 TEXT_COLOR = (255, 255, 255)  # 引言文字顏色
 AUTHOR_COLOR = (200, 200, 200)  # 作者文字顏色
@@ -20,10 +21,8 @@ VIGNETTE_GRADIENT_START_RATIO = 0.7 #蒙板漸變起始處 (0 ~ 1)
 #字型大小
 QUOTE_FONT_SIZE = 48
 AUTHOR_FONT_SIZE = 30
-HANDLE_FONT_SIZE = 24
-FOOTER_FONT_SIZE = 18
-#字型路徑
-FONT_PATH = r"data\GenSenRounded2-M.ttc"
+HANDLE_FONT_SIZE = 20
+FOOTER_FONT_SIZE = 14
 
 def create_black_mask(
     width: int, 
@@ -103,103 +102,7 @@ def image_handler(input_path: str):
         print(f"讀取或處理圖片 '{input_path}' 時發生錯誤: {e}")
         return None
 
-def create_composite_image(
-    input_path: str, 
-    canvas_size: tuple,
-    vignette_mask_info: dict
-):
-    """
-    將輸入圖片放置在畫布上，並應用一個可自訂的暈影效果。
-    """
-    try:
-        user_image = image_handler(input_path)
-    except FileNotFoundError:
-        print(f"錯誤：找不到指定的輸入圖片 '{input_path}'。")
-        return
-    except Exception as e:
-        print(f"讀取圖片時發生錯誤: {e}")
-        return
-
-    canvas_width, canvas_height = canvas_size
-
-    # 1. 創建一個黑色的 RGBA 畫布作為底層
-    background_canvas = Image.new('RGBA', canvas_size, (0, 0, 0, 255))
-
-    # 2. 中心裁切圖片至正方形
-    orig_w, orig_h = user_image.size
-    crop_size = min(orig_w, orig_h)
-    left = (orig_w - crop_size) // 2
-    top = (orig_h - crop_size) // 2
-    right = (orig_w + crop_size) // 2
-    bottom = (orig_h + crop_size) // 2
-    user_image = user_image.crop((left, top, right, bottom))
-
-    # 3. 按比例縮放用戶圖片
-    max_w = int(canvas_width * 0.4)
-    max_h = int(canvas_height * 0.8)
-    max_size = min(max_w, max_h)
-    user_image = user_image.resize((max_size, max_size), Image.Resampling.LANCZOS)
-    img_w, img_h = user_image.size
-
-    # 3. 計算位置
-    paste_center_x, paste_center_y = (canvas_width // 4, canvas_height // 2)
-    paste_x = paste_center_x - (img_w // 2)
-    paste_y = paste_center_y - (img_h // 2)
-
-
-    # 4. 將用戶圖片貼上到畫布
-    background_canvas.paste(user_image, (int(paste_x), int(paste_y)), user_image)
-
-    # 5. 從字典中提取蒙版信息並生成蒙版
-    mask_center = vignette_mask_info['center']
-    mask_radius = vignette_mask_info['radius']
-    mask_start_ratio = vignette_mask_info['start_ratio']
-    
-    print(f"正在生成中心點在 {mask_center}，半徑為 {mask_radius}px 的蒙版...")
-    print(f"漸變效果將在半徑的 {mask_start_ratio*100:.0f}% 處開始。")
-    vignette_mask = create_black_mask(
-        width=canvas_width, 
-        height=canvas_height, 
-        center=mask_center,
-        max_radius=mask_radius,
-        gradient_start_ratio=mask_start_ratio
-    )
-
-    # 6. 疊加蒙版
-    print("正在疊加蒙版...")
-    final_image = Image.alpha_composite(background_canvas, vignette_mask)
-
-    # 7. 保存結果
-    return final_image
-
-def create_quote_image(
-    quote_text: str,
-    author_info: str = None,
-    custom_image_path: str = None,
-    footer_text: str ="Creat by Noviren v0.1",
-    output_path: str = None,
-):
-    mask_settings = {
-        'center': (VIGNETTE_MASK_CENTER_X, VIGNETTE_MASK_CENTER_Y),
-        'radius': VIGNETTE_MASK_RADIUS_PIXELS,
-        'start_ratio': VIGNETTE_GRADIENT_START_RATIO
-    }
-    base_img = create_composite_image(
-        input_path=custom_image_path,
-        canvas_size=(CANVAS_WIDTH, CANVAS_HEIGHT),
-        vignette_mask_info=mask_settings
-    )
-    draw = ImageDraw.Draw(base_img)
-    quote_font = ImageFont.truetype(FONT_PATH, QUOTE_FONT_SIZE)
-    author_font = ImageFont.truetype(FONT_PATH, AUTHOR_FONT_SIZE)
-    handle_font = ImageFont.truetype(FONT_PATH, HANDLE_FONT_SIZE)
-    footer_font = ImageFont.truetype(FONT_PATH, FOOTER_FONT_SIZE)
-
-    text_area_left = CANVAS_WIDTH // 2 + 50
-    text_area_right = CANVAS_WIDTH - 50
-    text_area_width = text_area_right - text_area_left
-    
-    def wrap_text(text, font, max_width, draw_obj):
+def wrap_text(text, font, max_width, draw_obj):
         """
         專為無空格語言（如中文）設計的逐字換行函式。
         """
@@ -218,72 +121,163 @@ def create_quote_image(
         
         lines.append(current_line)
         return lines
+
+def create_composite_image(
+    input_path: str, 
+    canvas_size: tuple,
+    vignette_mask_info: dict,
+):
+    """
+    將輸入圖片放置在畫布上，並應用一個可自訂的暈影效果。
+    """
+    try:
+        user_image = image_handler(input_path)
+    except FileNotFoundError:
+        print(f"錯誤：找不到指定的輸入圖片 '{input_path}'。")
+        return
+    except Exception as e:
+        print(f"讀取圖片時發生錯誤: {e}")
+        return
+
+    canvas_width, canvas_height = canvas_size
+    background_canvas = Image.new('RGBA', canvas_size, (0, 0, 0, 255))
+
+    orig_w, orig_h = user_image.size
+    crop_size = min(orig_w, orig_h)
+    left = (orig_w - crop_size) // 2
+    top = (orig_h - crop_size) // 2
+    right = (orig_w + crop_size) // 2
+    bottom = (orig_h + crop_size) // 2
+    user_image = user_image.crop((left, top, right, bottom))
+
+    max_w = int(canvas_width * 0.4)
+    max_h = int(canvas_height * 0.8)
+    max_size = min(max_w, max_h)
+    user_image = user_image.resize((max_size, max_size), Image.Resampling.LANCZOS)
+    img_w, img_h = user_image.size
+
+    paste_center_x, paste_center_y = (canvas_width // 4, canvas_height // 2)
+    paste_x = paste_center_x - (img_w // 2)
+    paste_y = paste_center_y - (img_h // 2)
+
+    background_canvas.paste(user_image, (int(paste_x), int(paste_y)), user_image)
+
+    mask_center = vignette_mask_info['center']
+    mask_radius = vignette_mask_info['radius']
+    mask_start_ratio = vignette_mask_info['start_ratio']
     
+    print(f"正在生成中心點在 {mask_center}，半徑為 {mask_radius}px 的蒙版...")
+    print(f"漸變效果將在半徑的 {mask_start_ratio*100:.0f}% 處開始。")
+    vignette_mask = create_black_mask(
+        width=canvas_width, 
+        height=canvas_height, 
+        center=mask_center,
+        max_radius=mask_radius,
+        gradient_start_ratio=mask_start_ratio
+    )
+
+    print("正在疊加蒙版...")
+    final_image = Image.alpha_composite(background_canvas, vignette_mask)
+    return final_image
+
+def create_quote_image(output_path: str, quote_text: str, author_info: str, custom_image_path: str, footer_text: str = None):
+    mask_settings = {
+        'center': (int(VIGNETTE_MASK_CENTER_X), int(VIGNETTE_MASK_CENTER_Y)),
+        'radius': VIGNETTE_MASK_RADIUS_PIXELS,
+        'start_ratio': VIGNETTE_GRADIENT_START_RATIO
+    }
+    base_img = create_composite_image(
+        input_path=custom_image_path,
+        canvas_size=(CANVAS_WIDTH, CANVAS_HEIGHT),
+        vignette_mask_info=mask_settings
+    )
+    if base_img is None: return None
+
+    draw = ImageDraw.Draw(base_img)
+    quote_font = ImageFont.truetype(FONT_PATH, QUOTE_FONT_SIZE)
+    author_font = ImageFont.truetype(FONT_PATH, AUTHOR_FONT_SIZE)
+    handle_font = ImageFont.truetype(FONT_PATH, HANDLE_FONT_SIZE)
+    footer_font = ImageFont.truetype(FONT_PATH, FOOTER_FONT_SIZE)
+
+    text_area_left = CANVAS_WIDTH // 2 + 50
+    text_area_width = CANVAS_WIDTH - text_area_left - 50
+
     wrapped_quote_lines = wrap_text(quote_text, quote_font, text_area_width, draw)
     wrapped_quote_str = "\n".join(wrapped_quote_lines)
 
-    quote_bbox = draw.multiline_textbbox((0, 0), wrapped_quote_str, font=quote_font, spacing=10)
-    quote_height = quote_bbox[3] - quote_bbox[1]
-
-    total_text_height = quote_height
-
-    author_name = ""
-    author_handle = ""
+    author_name, author_handle = "", ""
     if author_info:
         parts = author_info.split('\n', 1)
         author_name = parts[0].strip()
         if len(parts) > 1:
             author_handle = parts[1].strip()
 
-        author_name_bbox = draw.textbbox((0, 0), f"- {author_name}", font=author_font)
-        author_name_height = author_name_bbox[3] - author_name_bbox[1]
-        total_text_height += author_name_height + 20
+    wrapped_author_name_str = ""
+    if author_name:
+        full_author_name = f"- {author_name}"
+        wrapped_author_name_lines = wrap_text(full_author_name, author_font, text_area_width, draw)
+        wrapped_author_name_str = "\n  ".join(wrapped_author_name_lines)
 
-        if author_handle:
-            handle_bbox = draw.textbbox((0, 0), author_handle, font=handle_font)
-            handle_height = handle_bbox[3] - handle_bbox[1]
-            total_text_height += handle_height + 5
+    wrapped_author_handle_str = ""
+    if author_handle:
+        wrapped_author_handle_lines = wrap_text(author_handle, handle_font, text_area_width - 15, draw)
+        wrapped_author_handle_str = "\n".join(wrapped_author_handle_lines)
+
+    quote_height, author_name_height, author_handle_height = 0, 0, 0
+
+    if wrapped_quote_str:
+        quote_bbox = draw.multiline_textbbox((0, 0), wrapped_quote_str, font=quote_font, spacing=10)
+        quote_height = quote_bbox[3] - quote_bbox[1]
+
+    if wrapped_author_name_str:
+        author_name_bbox = draw.multiline_textbbox((0, 0), wrapped_author_name_str, font=author_font, spacing=5)
+        author_name_height = author_name_bbox[3] - author_name_bbox[1]
+
+    if wrapped_author_handle_str:
+        author_handle_bbox = draw.multiline_textbbox((0, 0), wrapped_author_handle_str, font=handle_font, spacing=4)
+        author_handle_height = author_handle_bbox[3] - author_handle_bbox[1]
+
+    gap1, gap2 = 20, 8
+    total_text_height = quote_height
+    if author_name_height > 0: total_text_height += gap1 + author_name_height
+    if author_handle_height > 0: total_text_height += gap2 + author_handle_height
 
     start_y = (CANVAS_HEIGHT - total_text_height) // 2
+    current_y = float(start_y)
 
-    draw.multiline_text((text_area_left, start_y), wrapped_quote_str, font=quote_font, fill=TEXT_COLOR, spacing=10)
+    if wrapped_quote_str:
+        draw.multiline_text((text_area_left, current_y), wrapped_quote_str, font=quote_font, fill=TEXT_COLOR, spacing=10)
+        current_y += quote_height + gap1
 
-    current_y = start_y + quote_height + 20
-    if author_name:
-        draw.text((text_area_left, current_y), f"- {author_name}", font=author_font, fill=AUTHOR_COLOR)
-        current_y += (draw.textbbox((0,0), f"- {author_name}", font=author_font)[3] - draw.textbbox((0,0), f"- {author_name}", font=author_font)[1]) + 5
-        
-        if author_handle:
-            draw.text((text_area_left + 15, current_y), author_handle, font=handle_font, fill=AUTHOR_COLOR)
+    if wrapped_author_name_str:
+        draw.multiline_text((text_area_left, current_y), wrapped_author_name_str, font=author_font, fill=AUTHOR_COLOR, spacing=5)
+        current_y += author_name_height + gap2
+
+    if wrapped_author_handle_str:
+        draw.multiline_text((text_area_left + 15, current_y), wrapped_author_handle_str, font=handle_font, fill=AUTHOR_COLOR, spacing=4)
 
     if footer_text:
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        
+        display_date = datetime.now().strftime("%Y-%m-%d")
         right_margin = 30
         bottom_margin = 30
         line_spacing = 5
 
-        date_bbox = draw.textbbox((0, 0), date_str, font=footer_font)
+        date_bbox = draw.textbbox((0, 0), display_date, font=footer_font)
         date_width = date_bbox[2] - date_bbox[0]
         date_height = date_bbox[3] - date_bbox[1]
-        
         date_x = CANVAS_WIDTH - date_width - right_margin
         date_y = CANVAS_HEIGHT - date_height - bottom_margin
-        draw.text((date_x, date_y), date_str, font=footer_font, fill=FOOTER_COLOR)
+        draw.text((date_x, date_y), display_date, font=footer_font, fill=FOOTER_COLOR)
 
         footer_bbox = draw.textbbox((0, 0), footer_text, font=footer_font)
         footer_width = footer_bbox[2] - footer_bbox[0]
         footer_height = footer_bbox[3] - footer_bbox[1]
-        
         footer_x = CANVAS_WIDTH - footer_width - right_margin
         footer_y = date_y - footer_height - line_spacing
         draw.text((footer_x, footer_y), footer_text, font=footer_font, fill=FOOTER_COLOR)
 
-        if output_path is None:
-            return base_img
-        else:
-            base_img.save(output_path)
-            return output_path 
+    base_img.save(output_path)
+    return
 
 class MIQ:
     def __init__(self, bot: commands.Bot):
@@ -292,17 +286,28 @@ class MIQ:
     @app_commands.command(name="make_it_a_quote", description="製作經典語錄")
     @app_commands.describe(
         quote_context="引言的內容",
-        author="引言的作者",
-        custom_image="上傳自訂背景圖 (可選)"
+        author_member="引言的作者",
+        author_text="引言的作者(非成員)",
+        custom_image="上傳自訂背景圖 (可選)",
     )
     async def make_it_a_quote(
         self,
         itat: discord.Interaction,
         quote_context: str,
-        author: discord.Member,
-        custom_image: discord.Attachment = None
+        author_member: discord.Member = None,
+        author_text: str = None,
+        custom_image: discord.Attachment = None,
     ):
+        author_info = ""
+        if author_member is None and author_text is None:
+            author_info = "No_name"
+        elif author_member is None:
+            author_info = author_text
+        elif author_text is None:
+            author_info = f"{author_member.display_name}\n{author_member.global_name}"
+
         await itat.response.defer(thinking=True)
+        output_filename = f"quote_{itat.id}.png"
 
         image_url = ""
         if custom_image:
@@ -312,22 +317,18 @@ class MIQ:
                 await itat.followup.send("請上傳有效的圖片檔案 (例如 .png, .jpg)。", ephemeral=True)
                 return
         else:
-            image_url = author.avatar.url
-            output_filename = f"quote_{itat.id}.png"
-
+            image_url = author_member.avatar.url if author_member else DISCORD_DEFAULT_AVATAR
+            
         try:
-            generated_path = create_quote_image(
+            create_quote_image(
                 quote_text=quote_context,
-                author_info=f"{author.display_name}\n{author.global_name}",
+                author_info=author_info,
                 custom_image_path=image_url,
                 footer_text=f"Generated by Norvireon",
                 output_path = output_filename,
             )
 
-            if generated_path:
-                await itat.followup.send(file=discord.File(generated_path))
-            else:
-                await itat.followup.send("圖片生成失敗，請檢查後台日誌或圖片連結是否有效。", ephemeral=True)
+            await itat.followup.send(file=discord.File(output_filename, filename='quote.png'))
 
         except Exception as e:
             print(f"執行 /quote 指令時發生未預期錯誤: {e}")
