@@ -301,10 +301,10 @@ class MIQ:
         author_info = ""
         if author_member is None and author_text is None:
             author_info = "No_name"
-        elif author_member is None:
-            author_info = author_text
         elif author_text is None:
             author_info = f"{author_member.display_name}\n{author_member.global_name}"
+        else :
+            author_info = author_text
 
         await itat.response.defer(thinking=True)
         output_filename = f"quote_{itat.id}.png"
