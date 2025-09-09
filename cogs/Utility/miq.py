@@ -9,20 +9,23 @@ import requests
 
 from config import DISCORD_DEFAULT_AVATAR, FONT_PATH
 
-CANVAS_WIDTH, CANVAS_HEIGHT = 1280, 720  # 圖片寬度, 高度
+CANVAS_WIDTH, CANVAS_HEIGHT = 1920, 1080  # 圖片寬度, 高度
 TEXT_COLOR = (255, 255, 255)  # 引言文字顏色
 AUTHOR_COLOR = (200, 200, 200)  # 作者文字顏色
 FOOTER_COLOR = (150, 150, 150)  # 底部標記顏色
+LEFT_BG_COLOR = (26, 26, 26, 255) # 左側背景顏色 RGBA
+RIGHT_BG_COLOR = (26, 26, 26, 255) # 右側背景顏色 RGBA
 #蒙板中心位置
 VIGNETTE_MASK_CENTER_X = CANVAS_WIDTH*0
 VIGNETTE_MASK_CENTER_Y = CANVAS_HEIGHT*0.5
-VIGNETTE_MASK_RADIUS_PIXELS = 600 #蒙板大小
+VIGNETTE_MASK_RADIUS_PIXELS = 900 #蒙板大小
 VIGNETTE_GRADIENT_START_RATIO = 0.7 #蒙板漸變起始處 (0 ~ 1)
 #字型大小
-QUOTE_FONT_SIZE = 48
-AUTHOR_FONT_SIZE = 30
-HANDLE_FONT_SIZE = 20
-FOOTER_FONT_SIZE = 14
+QUOTE_FONT_SIZE = 72
+AUTHOR_FONT_SIZE = 45
+HANDLE_FONT_SIZE = 30
+FOOTER_FONT_SIZE = 21
+TEXT_MARGIN_WIDTH = 75  # 文字區域左右邊距
 
 def create_black_mask(
     width: int, 
@@ -63,7 +66,7 @@ def create_black_mask(
         y1_clear = center_y + gradient_start_radius
         draw.ellipse([x0_clear, y0_clear, x1_clear, y1_clear], fill=0)
 
-    base_image = Image.new('RGB', (width, height), (0, 0, 0))
+    base_image = Image.new('RGBA', (width, height), RIGHT_BG_COLOR)
     base_image.putalpha(alpha_mask)
     
     return base_image
@@ -140,7 +143,7 @@ def create_composite_image(
         return
 
     canvas_width, canvas_height = canvas_size
-    background_canvas = Image.new('RGBA', canvas_size, (0, 0, 0, 255))
+    background_canvas = Image.new('RGBA', canvas_size, LEFT_BG_COLOR)
 
     orig_w, orig_h = user_image.size
     crop_size = min(orig_w, orig_h)
@@ -199,8 +202,8 @@ def create_quote_image(output_path: str, quote_text: str, author_info: str, cust
     handle_font = ImageFont.truetype(FONT_PATH, HANDLE_FONT_SIZE)
     footer_font = ImageFont.truetype(FONT_PATH, FOOTER_FONT_SIZE)
 
-    text_area_left = CANVAS_WIDTH // 2 + 50
-    text_area_width = CANVAS_WIDTH - text_area_left - 50
+    text_area_left = CANVAS_WIDTH // 2 + TEXT_MARGIN_WIDTH
+    text_area_width = CANVAS_WIDTH - text_area_left - TEXT_MARGIN_WIDTH
 
     wrapped_quote_lines = wrap_text(quote_text, quote_font, text_area_width, draw)
     wrapped_quote_str = "\n".join(wrapped_quote_lines)
