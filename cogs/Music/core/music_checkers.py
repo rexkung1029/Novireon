@@ -7,57 +7,61 @@ from discord import VoiceClient as VC
 from pymongo import MongoClient
 
 from .music_data import voice_data
-from mongo_crud  import MongoCRUD
+from mongo_crud import MongoCRUD
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Music_Checkers")
 
 
 mongo_uri = os.getenv("MONGO_URI")
-mongo_client = MongoClient(
-    mongo_uri,
-    serverSelectionTimeoutMS=15000
-)
+mongo_client = MongoClient(mongo_uri, serverSelectionTimeoutMS=15000)
 
 db_handler = MongoCRUD(
-    client=mongo_client, 
-    db_name='Norvireon_bot_db', 
-    collection_name='Music_data',
-    logger=logger
+    client=mongo_client,
+    db_name="Norvireon_bot_db",
+    collection_name="Music_data",
+    logger=logger,
 )
 
-class Checkers():
+
+class Checkers:
     @staticmethod
-    def _is_in_valid_voice_channel(itat:Itat):
+    def _is_in_valid_voice_channel(itat: Itat):
         guild_id = itat.guild_id
         if itat.user.voice is None:
             return False
-        if guild_id not in voice_data: return True
-        if "client" not in voice_data[guild_id]: return True
-        client:VC = voice_data[guild_id]["client"]
+        if guild_id not in voice_data:
+            return True
+        if "client" not in voice_data[guild_id]:
+            return True
+        client: VC = voice_data[guild_id]["client"]
         if itat.guild.voice_client is None:
             return True
         return itat.user.voice.channel.id == client.channel.id
 
     @staticmethod
     def is_in_valid_voice_channel():
-        def predicate(itat:Itat) -> bool:
+        def predicate(itat: Itat) -> bool:
             return Checkers._is_in_valid_voice_channel(itat)
+
         return app_commands.check(predicate)
-    
+
     @staticmethod
     def is_dj():
-        def predicate(itat:Itat) -> bool:
+        def predicate(itat: Itat) -> bool:
             return Checkers._is_dj(itat)
-        return app_commands.check(predicate)
-    
-    @staticmethod
-    def _is_dj(itat:Itat) -> bool:
-        guild_id = itat.guild_id
-        settings = db_handler.get(query={"_id":guild_id})[0]
-        dj_role_id = settings.get('dj_role_id', None)
 
-        if itat.user.guild_permissions.administrator :return True
-        if dj_role_id is None :return False
+        return app_commands.check(predicate)
+
+    @staticmethod
+    def _is_dj(itat: Itat) -> bool:
+        guild_id = itat.guild_id
+        settings = db_handler.get(query={"_id": guild_id})[0]
+        dj_role_id = settings.get("dj_role_id", None)
+
+        if itat.user.guild_permissions.administrator:
+            return True
+        if dj_role_id is None:
+            return False
         elif dj_role_id is not None:
-            return (dj_role_id in [role.id for role in itat.user.roles])
+            return dj_role_id in [role.id for role in itat.user.roles]

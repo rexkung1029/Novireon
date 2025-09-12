@@ -1,59 +1,60 @@
-import discord 
+import discord
 import logging
 import os
 
-from discord     import app_commands
-from discord     import Interaction as Itat
-from discord     import VoiceClient as VC
+from discord import app_commands
+from discord import Interaction as Itat
+from discord import VoiceClient as VC
 from discord.ext import commands
-from pymongo     import MongoClient
+from pymongo import MongoClient
 
-from mongo_crud       import MongoCRUD
-from .                import music_utils
-from .music_checkers  import Checkers
-from .music_data      import voice_data
+from mongo_crud import MongoCRUD
+from . import music_utils
+from .music_checkers import Checkers
+from .music_data import voice_data
 from .music_functions import Functions
-from ..monster_siren  import Monster_siren
-from ..youtube        import Youtube
-
+from ..monster_siren import Monster_siren
+from ..youtube import Youtube
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Music_Main")
 
 ffmpeg_options = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn -filter:a "volume=0.3"'
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "options": '-vn -filter:a "volume=0.3"',
 }
 
 mongo_uri = os.getenv("MONGO_URI")
-mongo_client = MongoClient(
-    mongo_uri,
-    serverSelectionTimeoutMS=15000
-)
+mongo_client = MongoClient(mongo_uri, serverSelectionTimeoutMS=15000)
 
 db_handler = MongoCRUD(
-    client=mongo_client, 
-    db_name='Norvireon_bot_db', 
-    collection_name='Music_data',
-    logger=logger
+    client=mongo_client,
+    db_name="Norvireon_bot_db",
+    collection_name="Music_data",
+    logger=logger,
 )
+
 
 class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         logger.info("Music Cog initialized with DB handler.")
- 
+
     @app_commands.command(name="play", description="播放音樂")
     @app_commands.describe(request="可使用網址或直接搜尋")
     @Checkers.is_in_valid_voice_channel()
-    async def command_play(self, itat:Itat, request:str):
-        
+    async def command_play(self, itat: Itat, request: str):
+
         try:
             await itat.response.send_message("處理中", ephemeral=True)
 
             if itat.user.voice is None:
-                await itat.followup.send("您必須先加入一個語音頻道才能使用此指令！",ephemeral=True, delete_after=5)
+                await itat.followup.send(
+                    "您必須先加入一個語音頻道才能使用此指令！",
+                    ephemeral=True,
+                    delete_after=5,
+                )
                 return
 
             guild_id = itat.guild_id
@@ -61,11 +62,15 @@ class Music(commands.Cog):
             if guild_id not in voice_data:
                 voice_data[guild_id] = {}
                 music_utils.return_to_default_music_settings(guild_id)
-            
+
             elif "client" in voice_data[guild_id]:
-                voice_client:VC = voice_data[guild_id]["client"]
+                voice_client: VC = voice_data[guild_id]["client"]
                 if itat.user.voice.channel.id != voice_client.channel.id:
-                    await itat.followup.send("您必須先加入與機器人相同語音頻道才能使用此指令！",ephemeral=True, delete_after=5)
+                    await itat.followup.send(
+                        "您必須先加入與機器人相同語音頻道才能使用此指令！",
+                        ephemeral=True,
+                        delete_after=5,
+                    )
                     return
 
             voice_data[guild_id]["music_channel"] = itat.channel
@@ -75,33 +80,37 @@ class Music(commands.Cog):
                 case "youtube":
                     data = await Youtube.get_data(request)
                 case "monster_siren":
-                    data = Monster_siren.get_song_data(request)                  
-                case '' :
+                    data = Monster_siren.get_song_data(request)
+                case "":
                     data = await Functions.search(itat, request)
                     if data is None:
                         return
-            
+
             if data is None:
-                await itat.followup.send("找不到相關的音樂，請嘗試其他關鍵字或網址", ephemeral=True)
+                await itat.followup.send(
+                    "找不到相關的音樂，請嘗試其他關鍵字或網址", ephemeral=True
+                )
                 return
             else:
-                db_handler.append(
-                    query={"_id":guild_id},
-                    field="queue",
-                    value=data
-                )
+                db_handler.append(query={"_id": guild_id}, field="queue", value=data)
 
-            title = data.get('title', 'Unknown Title')
-            thumbnail = data.get('thumbnail', '')
-            duration = data.get('duration', 0)
-            author = data.get('author', 'Unknown Artist')
+            title = data.get("title", "Unknown Title")
+            thumbnail = data.get("thumbnail", "")
+            duration = data.get("duration", 0)
+            author = data.get("author", "Unknown Artist")
 
-            if ("client" not in voice_data[guild_id]) or (not voice_data[guild_id]["client"].is_connected()):
+            if ("client" not in voice_data[guild_id]) or (
+                not voice_data[guild_id]["client"].is_connected()
+            ):
                 await itat.followup.send("正在處理播放請求", ephemeral=True)
                 await Functions._play(guild_id)
-                    
+
             else:
-                embed = discord.Embed(color=0x28ff28, title=f"加入佇列: {title}", description=f"by {author}")
+                embed = discord.Embed(
+                    color=0x28FF28,
+                    title=f"加入佇列: {title}",
+                    description=f"by {author}",
+                )
                 embed.set_thumbnail(url=thumbnail)
                 embed.add_field(name="時長", value=music_utils.format_time(duration))
                 await itat.followup.send(embed=embed)
@@ -113,7 +122,7 @@ class Music(commands.Cog):
     @app_commands.command(name="stop", description="停止播放音樂")
     @Checkers.is_dj()
     @Checkers.is_in_valid_voice_channel()
-    async def command_stop(self, itat:Itat):
+    async def command_stop(self, itat: Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id
         await Functions._stop(guild_id)
@@ -121,7 +130,7 @@ class Music(commands.Cog):
     @app_commands.command(name="skip", description="跳過當前曲目")
     @Checkers.is_dj()
     @Checkers.is_in_valid_voice_channel()
-    async def command_skip(self, itat:Itat):
+    async def command_skip(self, itat: Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id
         await Functions._skip(guild_id)
@@ -129,17 +138,15 @@ class Music(commands.Cog):
     @app_commands.command(name="pause", description="暫停音樂")
     @Checkers.is_dj()
     @Checkers.is_in_valid_voice_channel()
-    async def command_pause(self, itat:Itat):
+    async def command_pause(self, itat: Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id
-        await Functions._pause(guild_id)    
+        await Functions._pause(guild_id)
 
     @app_commands.command(name="resume", description="繼續播放")
     @Checkers.is_dj()
     @Checkers.is_in_valid_voice_channel()
-    async def command_resume(self, itat:Itat):
+    async def command_resume(self, itat: Itat):
         await itat.response.send_message("處理中", ephemeral=True, delete_after=5)
         guild_id = itat.guild_id
-        await Functions._resume(guild_id)  
-
-    
+        await Functions._resume(guild_id)

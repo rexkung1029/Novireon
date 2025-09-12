@@ -13,26 +13,23 @@ CANVAS_WIDTH, CANVAS_HEIGHT = 1920, 1080  # 圖片寬度, 高度
 TEXT_COLOR = (255, 255, 255)  # 引言文字顏色
 AUTHOR_COLOR = (200, 200, 200)  # 作者文字顏色
 FOOTER_COLOR = (150, 150, 150)  # 底部標記顏色
-LEFT_BG_COLOR = (26, 26, 26, 255) # 左側背景顏色 RGBA
-RIGHT_BG_COLOR = (26, 26, 26, 255) # 右側背景顏色 RGBA
-#蒙板中心位置
-VIGNETTE_MASK_CENTER_X = CANVAS_WIDTH*0
-VIGNETTE_MASK_CENTER_Y = CANVAS_HEIGHT*0.5
-VIGNETTE_MASK_RADIUS_PIXELS = 900 #蒙板大小
-VIGNETTE_GRADIENT_START_RATIO = 0.7 #蒙板漸變起始處 (0 ~ 1)
-#字型大小
+LEFT_BG_COLOR = (26, 26, 26, 255)  # 左側背景顏色 RGBA
+RIGHT_BG_COLOR = (26, 26, 26, 255)  # 右側背景顏色 RGBA
+# 蒙板中心位置
+VIGNETTE_MASK_CENTER_X = CANVAS_WIDTH * 0
+VIGNETTE_MASK_CENTER_Y = CANVAS_HEIGHT * 0.5
+VIGNETTE_MASK_RADIUS_PIXELS = 900  # 蒙板大小
+VIGNETTE_GRADIENT_START_RATIO = 0.7  # 蒙板漸變起始處 (0 ~ 1)
+# 字型大小
 QUOTE_FONT_SIZE = 72
 AUTHOR_FONT_SIZE = 45
 HANDLE_FONT_SIZE = 30
 FOOTER_FONT_SIZE = 21
 TEXT_MARGIN_WIDTH = 75  # 文字區域左右邊距
 
+
 def create_black_mask(
-    width: int, 
-    height: int, 
-    center: tuple, 
-    max_radius: int, 
-    gradient_start_ratio: float
+    width: int, height: int, center: tuple, max_radius: int, gradient_start_ratio: float
 ):
     """
     Args:
@@ -46,7 +43,7 @@ def create_black_mask(
     gradient_start_radius = int(max_radius * gradient_start_ratio)
     gradient_width = max_radius - gradient_start_radius
 
-    alpha_mask = Image.new('L', (width, height), 255)
+    alpha_mask = Image.new("L", (width, height), 255)
     draw = ImageDraw.Draw(alpha_mask)
 
     if gradient_width > 0:
@@ -54,7 +51,7 @@ def create_black_mask(
             progress_in_gradient = (i - gradient_start_radius) / gradient_width
             alpha = 255 * progress_in_gradient**1
             alpha = int(max(0, min(255, alpha)))
-            
+
             x0, y0 = center_x - i, center_y - i
             x1, y1 = center_x + i, center_y + i
             draw.ellipse([x0, y0, x1, y1], fill=alpha)
@@ -66,10 +63,11 @@ def create_black_mask(
         y1_clear = center_y + gradient_start_radius
         draw.ellipse([x0_clear, y0_clear, x1_clear, y1_clear], fill=0)
 
-    base_image = Image.new('RGBA', (width, height), RIGHT_BG_COLOR)
+    base_image = Image.new("RGBA", (width, height), RIGHT_BG_COLOR)
     base_image.putalpha(alpha_mask)
-    
+
     return base_image
+
 
 def image_handler(input_path: str):
     """
@@ -83,16 +81,16 @@ def image_handler(input_path: str):
         None: 發生任何錯誤時回傳 None。
     """
     try:
-        if input_path.startswith(('http://', 'https://')):
+        if input_path.startswith(("http://", "https://")):
             print(f"正在從 URL 下載圖片: {input_path}")
             response = requests.get(input_path, stream=True)
             response.raise_for_status()
             image_data = io.BytesIO(response.content)
-            image = Image.open(image_data).convert('RGBA')
+            image = Image.open(image_data).convert("RGBA")
             return image
         else:
             print(f"正在讀取本地圖片: {input_path}")
-            image = Image.open(input_path).convert('RGBA')
+            image = Image.open(input_path).convert("RGBA")
             return image
 
     except FileNotFoundError:
@@ -104,6 +102,7 @@ def image_handler(input_path: str):
     except Exception as e:
         print(f"讀取或處理圖片 '{input_path}' 時發生錯誤: {e}")
         return None
+
 
 def wrap_text(text, font, max_width, draw_obj):
     """
@@ -121,12 +120,13 @@ def wrap_text(text, font, max_width, draw_obj):
         else:
             lines.append(current_line)
             current_line = char
-    
+
     lines.append(current_line)
     return lines
 
+
 def create_composite_image(
-    input_path: str, 
+    input_path: str,
     canvas_size: tuple,
     vignette_mask_info: dict,
 ):
@@ -143,7 +143,7 @@ def create_composite_image(
         return
 
     canvas_width, canvas_height = canvas_size
-    background_canvas = Image.new('RGBA', canvas_size, LEFT_BG_COLOR)
+    background_canvas = Image.new("RGBA", canvas_size, LEFT_BG_COLOR)
 
     orig_w, orig_h = user_image.size
     crop_size = min(orig_w, orig_h)
@@ -165,25 +165,32 @@ def create_composite_image(
 
     background_canvas.paste(user_image, (int(paste_x), int(paste_y)), user_image)
 
-    mask_center = vignette_mask_info['center']
-    mask_radius = vignette_mask_info['radius']
-    mask_start_ratio = vignette_mask_info['start_ratio']
-    
+    mask_center = vignette_mask_info["center"]
+    mask_radius = vignette_mask_info["radius"]
+    mask_start_ratio = vignette_mask_info["start_ratio"]
+
     print(f"正在生成中心點在 {mask_center}，半徑為 {mask_radius}px 的蒙版...")
     print(f"漸變效果將在半徑的 {mask_start_ratio*100:.0f}% 處開始。")
     vignette_mask = create_black_mask(
-        width=canvas_width, 
-        height=canvas_height, 
+        width=canvas_width,
+        height=canvas_height,
         center=mask_center,
         max_radius=mask_radius,
-        gradient_start_ratio=mask_start_ratio
+        gradient_start_ratio=mask_start_ratio,
     )
 
     print("正在疊加蒙版...")
     final_image = Image.alpha_composite(background_canvas, vignette_mask)
     return final_image
 
-def create_quote_image(output_path: str, quote_text: str, author_info: str, custom_image_path: str, footer_text: str = None):
+
+def create_quote_image(
+    output_path: str,
+    quote_text: str,
+    author_info: str,
+    custom_image_path: str,
+    footer_text: str = None,
+):
     """
     根據提供的引言、作者資訊與背景圖片，生成一張語錄圖片並儲存至指定路徑。
 
@@ -199,14 +206,14 @@ def create_quote_image(output_path: str, quote_text: str, author_info: str, cust
         Any: 成功時無回傳值（即隱式回傳 None），僅將圖片儲存至指定路徑。
     """
     mask_settings = {
-        'center': (int(VIGNETTE_MASK_CENTER_X), int(VIGNETTE_MASK_CENTER_Y)),
-        'radius': VIGNETTE_MASK_RADIUS_PIXELS,
-        'start_ratio': VIGNETTE_GRADIENT_START_RATIO
+        "center": (int(VIGNETTE_MASK_CENTER_X), int(VIGNETTE_MASK_CENTER_Y)),
+        "radius": VIGNETTE_MASK_RADIUS_PIXELS,
+        "start_ratio": VIGNETTE_GRADIENT_START_RATIO,
     }
     base_img = create_composite_image(
         input_path=custom_image_path,
         canvas_size=(CANVAS_WIDTH, CANVAS_HEIGHT),
-        vignette_mask_info=mask_settings
+        vignette_mask_info=mask_settings,
     )
     if base_img is None:
         return None
@@ -225,7 +232,7 @@ def create_quote_image(output_path: str, quote_text: str, author_info: str, cust
 
     author_name, author_handle = "", ""
     if author_info:
-        parts = author_info.split('\n', 1)
+        parts = author_info.split("\n", 1)
         author_name = parts[0].strip()
         if len(parts) > 1:
             author_handle = parts[1].strip()
@@ -233,46 +240,76 @@ def create_quote_image(output_path: str, quote_text: str, author_info: str, cust
     wrapped_author_name_str = ""
     if author_name:
         full_author_name = f"- {author_name}"
-        wrapped_author_name_lines = wrap_text(full_author_name, author_font, text_area_width, draw)
+        wrapped_author_name_lines = wrap_text(
+            full_author_name, author_font, text_area_width, draw
+        )
         wrapped_author_name_str = "\n  ".join(wrapped_author_name_lines)
 
     wrapped_author_handle_str = ""
     if author_handle:
-        wrapped_author_handle_lines = wrap_text(author_handle, handle_font, text_area_width - 15, draw)
+        wrapped_author_handle_lines = wrap_text(
+            author_handle, handle_font, text_area_width - 15, draw
+        )
         wrapped_author_handle_str = "\n".join(wrapped_author_handle_lines)
 
     quote_height, author_name_height, author_handle_height = 0, 0, 0
 
     if wrapped_quote_str:
-        quote_bbox = draw.multiline_textbbox((0, 0), wrapped_quote_str, font=quote_font, spacing=10)
+        quote_bbox = draw.multiline_textbbox(
+            (0, 0), wrapped_quote_str, font=quote_font, spacing=10
+        )
         quote_height = quote_bbox[3] - quote_bbox[1]
 
     if wrapped_author_name_str:
-        author_name_bbox = draw.multiline_textbbox((0, 0), wrapped_author_name_str, font=author_font, spacing=5)
+        author_name_bbox = draw.multiline_textbbox(
+            (0, 0), wrapped_author_name_str, font=author_font, spacing=5
+        )
         author_name_height = author_name_bbox[3] - author_name_bbox[1]
 
     if wrapped_author_handle_str:
-        author_handle_bbox = draw.multiline_textbbox((0, 0), wrapped_author_handle_str, font=handle_font, spacing=4)
+        author_handle_bbox = draw.multiline_textbbox(
+            (0, 0), wrapped_author_handle_str, font=handle_font, spacing=4
+        )
         author_handle_height = author_handle_bbox[3] - author_handle_bbox[1]
 
     gap1, gap2 = 20, 8
     total_text_height = quote_height
-    if author_name_height > 0: total_text_height += gap1 + author_name_height
-    if author_handle_height > 0: total_text_height += gap2 + author_handle_height
+    if author_name_height > 0:
+        total_text_height += gap1 + author_name_height
+    if author_handle_height > 0:
+        total_text_height += gap2 + author_handle_height
 
     start_y = (CANVAS_HEIGHT - total_text_height) // 2
     current_y = float(start_y)
 
     if wrapped_quote_str:
-        draw.multiline_text((text_area_left, current_y), wrapped_quote_str, font=quote_font, fill=TEXT_COLOR, spacing=10)
+        draw.multiline_text(
+            (text_area_left, current_y),
+            wrapped_quote_str,
+            font=quote_font,
+            fill=TEXT_COLOR,
+            spacing=10,
+        )
         current_y += quote_height + gap1
 
     if wrapped_author_name_str:
-        draw.multiline_text((text_area_left, current_y), wrapped_author_name_str, font=author_font, fill=AUTHOR_COLOR, spacing=5)
+        draw.multiline_text(
+            (text_area_left, current_y),
+            wrapped_author_name_str,
+            font=author_font,
+            fill=AUTHOR_COLOR,
+            spacing=5,
+        )
         current_y += author_name_height + gap2
 
     if wrapped_author_handle_str:
-        draw.multiline_text((text_area_left + 15, current_y), wrapped_author_handle_str, font=handle_font, fill=AUTHOR_COLOR, spacing=4)
+        draw.multiline_text(
+            (text_area_left + 15, current_y),
+            wrapped_author_handle_str,
+            font=handle_font,
+            fill=AUTHOR_COLOR,
+            spacing=4,
+        )
 
     if footer_text:
         display_date = datetime.now().strftime("%Y-%m-%d")
@@ -292,13 +329,16 @@ def create_quote_image(output_path: str, quote_text: str, author_info: str, cust
         footer_height = footer_bbox[3] - footer_bbox[1]
         footer_x = CANVAS_WIDTH - footer_width - right_margin
         footer_y = date_y - footer_height - line_spacing
-        draw.text((footer_x, footer_y), footer_text, font=footer_font, fill=FOOTER_COLOR)
+        draw.text(
+            (footer_x, footer_y), footer_text, font=footer_font, fill=FOOTER_COLOR
+        )
 
     try:
         base_img.save(output_path, format="PNG")
     except Exception as e:
         print(f"儲存圖片 '{output_path}' 時發生錯誤: {e}")
         return None
+
 
 class MIQ:
     def __init__(self, bot: commands.Bot):
@@ -324,7 +364,7 @@ class MIQ:
             author_info = "No_name"
         elif author_text is None:
             author_info = f"{author_member.display_name}\n{author_member.global_name}"
-        else :
+        else:
             author_info = author_text
 
         await itat.response.defer(thinking=True)
@@ -335,21 +375,27 @@ class MIQ:
             if custom_image.content_type and "image" in custom_image.content_type:
                 image_url = custom_image.url
             else:
-                await itat.followup.send("請上傳有效的圖片檔案 (例如 .png, .jpg)。", ephemeral=True)
+                await itat.followup.send(
+                    "請上傳有效的圖片檔案 (例如 .png, .jpg)。", ephemeral=True
+                )
                 return
         else:
-            image_url = author_member.avatar.url if author_member else DISCORD_DEFAULT_AVATAR
-            
+            image_url = (
+                author_member.avatar.url if author_member else DISCORD_DEFAULT_AVATAR
+            )
+
         try:
             create_quote_image(
                 quote_text=quote_context,
                 author_info=author_info,
                 custom_image_path=image_url,
                 footer_text=f"Generated by Norvireon",
-                output_path = output_filename,
+                output_path=output_filename,
             )
 
-            await itat.followup.send(file=discord.File(output_filename, filename='quote.png'))
+            await itat.followup.send(
+                file=discord.File(output_filename, filename="quote.png")
+            )
 
         except Exception as e:
             print(f"執行 /quote 指令時發生未預期錯誤: {e}")

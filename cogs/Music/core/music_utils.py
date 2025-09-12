@@ -3,33 +3,30 @@ import logging
 import time
 import urllib.parse
 
-from discord       import Interaction as Itat
-from discord.ext   import commands
+from discord import Interaction as Itat
+from discord.ext import commands
 from discord.utils import get
-from mongo_crud    import MongoCRUD
-from pymongo       import MongoClient
+from mongo_crud import MongoCRUD
+from pymongo import MongoClient
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Music_Utils")
 
-mongo_client = MongoClient(
-    "mongodb://localhost:27017/",
-    serverSelectionTimeoutMS=15000
-)
+mongo_client = MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=15000)
 
 music_db_handler = MongoCRUD(
-            client=mongo_client, 
-            db_name='Norvireon_bot_db', 
-            collection_name='Music_data',
-            logger=logger
-        )
+    client=mongo_client,
+    db_name="Norvireon_bot_db",
+    collection_name="Music_data",
+    logger=logger,
+)
 
 db_handler = MongoCRUD(
-    client=mongo_client, 
-    db_name='Norvireon_bot_db', 
-    collection_name='Music_data',
-    logger=logger
+    client=mongo_client,
+    db_name="Norvireon_bot_db",
+    collection_name="Music_data",
+    logger=logger,
 )
 
 
@@ -38,15 +35,17 @@ def format_time(seconds):
     hours, mins = divmod(int(mins), 60)
     return f"{hours}:{mins:02}:{secs:02}" if hours > 0 else f"{mins}:{secs:02}"
 
+
 def generate_progress_bar(guild_id):
-    data = db_handler.get(query= {'_id':guild_id})[0]
-    is_playing = data.get('is_playing')
-    start_time = data['start_time']
-    duration = data['duration']
-    total_paused_duration = data['total_paused_duration']
-    author = data.get('author', 'Unknown Artist')
-    if duration == 0: return ""
-    if total_paused_duration is None: 
+    data = db_handler.get(query={"_id": guild_id})[0]
+    is_playing = data.get("is_playing")
+    start_time = data["start_time"]
+    duration = data["duration"]
+    total_paused_duration = data["total_paused_duration"]
+    author = data.get("author", "Unknown Artist")
+    if duration == 0:
+        return ""
+    if total_paused_duration is None:
         total_paused_duration = 0
 
     if not is_playing:
@@ -57,10 +56,13 @@ def generate_progress_bar(guild_id):
     progress = min(elapsed / duration, 1.0)
     length = 20
     filled_length = int(length * progress)
-    bar = '─' * filled_length + '•' + '─' * (length - filled_length - 1)
+    bar = "─" * filled_length + "•" + "─" * (length - filled_length - 1)
 
-    if is_playing: return f"播放中\n`[{bar}]` `({format_time(elapsed)}/{format_time(duration)})`"
-    else         : return f"已暫停\n`[{bar}]` `({format_time(elapsed)}/{format_time(duration)})`"
+    if is_playing:
+        return f"播放中\n`[{bar}]` `({format_time(elapsed)}/{format_time(duration)})`"
+    else:
+        return f"已暫停\n`[{bar}]` `({format_time(elapsed)}/{format_time(duration)})`"
+
 
 def get_source_name(url):
     if not isinstance(url, str):
@@ -82,20 +84,21 @@ def is_valid_url(url):
     except ValueError:
         return False
 
+
 def return_to_default_music_settings(guild_id):
     try:
         music_db_handler.update_one(
-                query={"_id":guild_id},
-                new_values={
-                    "current_playing":{},
-                    "embed_message_id":None,
-                    "is_playing":False,
-                    "if_recommend": False,
-                    "played":[],
-                    "queue":[]
-                },
-                upsert=True
-            )
+            query={"_id": guild_id},
+            new_values={
+                "current_playing": {},
+                "embed_message_id": None,
+                "is_playing": False,
+                "if_recommend": False,
+                "played": [],
+                "queue": [],
+            },
+            upsert=True,
+        )
         logger.info("returned to default music settings.")
     except Exception as e:
         logger.critical(f"Can not return to default music seettings!")

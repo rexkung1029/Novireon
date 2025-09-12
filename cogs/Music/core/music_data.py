@@ -1,1 +1,1 @@
-voice_data:dict ={}
+voice_data: dict = {}

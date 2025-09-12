@@ -2,6 +2,7 @@ from discord.ext import commands
 from .core.music_main import Music
 from .core.music_setup import MusicSetup
 import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Music_Core")
 
