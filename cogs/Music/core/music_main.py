@@ -48,6 +48,7 @@ class Music(commands.Cog):
     @app_commands.describe(request="可使用網址或直接搜尋")
     @Checkers.is_in_valid_voice_channel()
     async def command_play(self, itat:Itat, request:str):
+        
         try:
             await itat.response.send_message("處理中", ephemeral=True)
 
@@ -67,35 +68,35 @@ class Music(commands.Cog):
                     await itat.followup.send("您必須先加入與機器人相同語音頻道才能使用此指令！",ephemeral=True, delete_after=5)
                     return
 
-            voice_data[guild_id]["music_channel"]=itat.channel
-            voice_data[guild_id]["itat"]=itat
+            voice_data[guild_id]["music_channel"] = itat.channel
+            voice_data[guild_id]["itat"] = itat
 
             match music_utils.get_source_name(request):
                 case "youtube":
                     data = await Youtube.get_data(request)
-                    db_handler.append(
-                        query={"_id":guild_id},
-                        field="queue",
-                        value=data
-                    )
                 case "monster_siren":
-                    data = Monster_siren.get_song_data(request)
-                    db_handler.append(
-                        query={"_id":guild_id},
-                        field="queue",
-                        value=data
-                    )
+                    data = Monster_siren.get_song_data(request)                  
                 case '' :
-                    await Functions.search(itat, request)
-                    return
-                
+                    data = await Functions.search(itat, request)
+                    if data is None:
+                        return
+            
+            if data is None:
+                await itat.followup.send("找不到相關的音樂，請嘗試其他關鍵字或網址", ephemeral=True)
+                return
+            else:
+                db_handler.append(
+                    query={"_id":guild_id},
+                    field="queue",
+                    value=data
+                )
 
             title = data.get('title', 'Unknown Title')
             thumbnail = data.get('thumbnail', '')
-            duration = data['duration']
+            duration = data.get('duration', 0)
             author = data.get('author', 'Unknown Artist')
 
-            if "client" not in voice_data[guild_id] or not voice_data[guild_id]["client"].is_connected():
+            if ("client" not in voice_data[guild_id]) or (not voice_data[guild_id]["client"].is_connected()):
                 await itat.followup.send("正在處理播放請求", ephemeral=True)
                 await Functions._play(guild_id)
                     
@@ -107,6 +108,7 @@ class Music(commands.Cog):
 
         except Exception as e:
             logger.error(f"Command_play Error {e}")
+            await itat.followup.send("執行指令時發生錯誤，請稍後再試。", ephemeral=True)
 
     @app_commands.command(name="stop", description="停止播放音樂")
     @Checkers.is_dj()

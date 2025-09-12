@@ -106,24 +106,24 @@ def image_handler(input_path: str):
         return None
 
 def wrap_text(text, font, max_width, draw_obj):
-        """
-        專為無空格語言（如中文）設計的逐字換行函式。
-        """
-        lines = []
-        if not text:
-            return lines
-
-        current_line = ""
-        for char in text:
-            test_line = current_line + char
-            if draw_obj.textlength(test_line, font=font) <= max_width:
-                current_line = test_line
-            else:
-                lines.append(current_line)
-                current_line = char
-        
-        lines.append(current_line)
+    """
+    專為無空格語言（如中文）設計的逐字換行函式。
+    """
+    lines = []
+    if not text:
         return lines
+
+    current_line = ""
+    for char in text:
+        test_line = current_line + char
+        if draw_obj.textlength(test_line, font=font) <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = char
+    
+    lines.append(current_line)
+    return lines
 
 def create_composite_image(
     input_path: str, 
@@ -184,6 +184,20 @@ def create_composite_image(
     return final_image
 
 def create_quote_image(output_path: str, quote_text: str, author_info: str, custom_image_path: str, footer_text: str = None):
+    """
+    根據提供的引言、作者資訊與背景圖片，生成一張語錄圖片並儲存至指定路徑。
+
+    Args:
+        output_path (str): 輸出圖片的檔案路徑。
+        quote_text (str): 引言內容。
+        author_info (str): 作者資訊 (可含名稱與標籤)。
+        custom_image_path (str): 背景圖片的路徑或 URL。
+        footer_text (str, optional): 底部標記文字。預設為 None。
+
+    Returns:
+        None: 若發生錯誤或生成失敗時回傳 None。
+        Any: 成功時無回傳值（即隱式回傳 None），僅將圖片儲存至指定路徑。
+    """
     mask_settings = {
         'center': (int(VIGNETTE_MASK_CENTER_X), int(VIGNETTE_MASK_CENTER_Y)),
         'radius': VIGNETTE_MASK_RADIUS_PIXELS,
@@ -194,7 +208,8 @@ def create_quote_image(output_path: str, quote_text: str, author_info: str, cust
         canvas_size=(CANVAS_WIDTH, CANVAS_HEIGHT),
         vignette_mask_info=mask_settings
     )
-    if base_img is None: return None
+    if base_img is None:
+        return None
 
     draw = ImageDraw.Draw(base_img)
     quote_font = ImageFont.truetype(FONT_PATH, QUOTE_FONT_SIZE)
@@ -279,8 +294,11 @@ def create_quote_image(output_path: str, quote_text: str, author_info: str, cust
         footer_y = date_y - footer_height - line_spacing
         draw.text((footer_x, footer_y), footer_text, font=footer_font, fill=FOOTER_COLOR)
 
-    base_img.save(output_path)
-    return
+    try:
+        base_img.save(output_path, format="PNG")
+    except Exception as e:
+        print(f"儲存圖片 '{output_path}' 時發生錯誤: {e}")
+        return None
 
 class MIQ:
     def __init__(self, bot: commands.Bot):

@@ -195,7 +195,6 @@ class Functions():
 
     async def search(itat:Itat, request, region='youtube'):
         try:
-            guild_id = itat.guild_id
             await itat.followup.send(f"正在搜尋: `{request}`...", ephemeral=True)
 
             match region:
@@ -219,30 +218,36 @@ class Functions():
                 min_values=1,
                 max_values=1
             )
-            view = View()
+            view = View(timeout=30)
             view.add_item(search_menu)
-
-            original_message = await itat.followup.send(content="請從下方選擇一個結果", view=view, ephemeral=True)
+            future = asyncio.Future()
+            
+            async def on_timeout():
+                if not future.done():
+                    future.set_result(None)
+                search_menu.disabled = True
+                await original_message.edit(content="選擇已超時，請重新搜尋。", view=None)
+            view.on_timeout = on_timeout
 
             async def search_menu_callback(s_itat:Itat):
                 try:
+                    search_menu.disabled = True
                     song_url = s_itat.data['values'][0]
                     await original_message.edit(content="處理中...", view=None)
-                    song_data = await Youtube.get_data(song_url)
-                    
-                    db_handler.append(
-                        query={"_id":guild_id},
-                        field="queue",
-                        value=song_data
-                    )
 
-                    if "client" not in voice_data[guild_id] or not voice_data[guild_id]["client"].is_connected():
-                        await Functions._play(guild_id)
+                    match region:
+                        case 'youtube':
+                          song_data = await Youtube.get_data(song_url)
+                    if not future.done():
+                        future.set_result(song_data)
 
                 except Exception as e:
                     print(f"search_callback error: {e}")
-
             search_menu.callback = search_menu_callback
+
+            original_message = await itat.followup.send(content="請從下方選擇一個結果", view=view, ephemeral=True)
+            selected_song_data = await future
+            return selected_song_data
 
         except Exception as e:
             logger.error(f"search error: {e}")
