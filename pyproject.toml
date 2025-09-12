@@ -1,9 +1,9 @@
 [project]
 name = "Novireon"
-version = "0.2.1"
+version = "0.2.2"
 requires-python = ">=3.13"
 dependencies = [
-    "discord>=2.3.2",
+    "discord-py>=2.6.3",
     "google-api-python-client>=2.179.0",
     "motor>=3.7.1",
     "pillow>=11.3.0",
