@@ -3,11 +3,15 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import io
+import logging
 import os
 from PIL import Image, ImageDraw, ImageFont
 import requests
 
-from config import DISCORD_DEFAULT_AVATAR, FONT_PATH
+from config import DISCORD_DEFAULT_AVATAR, FONT_PATH, DEFAULT_AVATAR
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("MIQ")
 
 CANVAS_WIDTH, CANVAS_HEIGHT = 1920, 1080  # 圖片寬度, 高度
 TEXT_COLOR = (255, 255, 255)  # 引言文字顏色
@@ -71,7 +75,7 @@ def create_black_mask(
 
 def image_handler(input_path: str):
     """
-    從本地路徑或 URL 安全地開啟圖片。
+    從本地路徑或 URL 開啟圖片。
 
     Args:
         input_path (str): 圖片的本地檔案路徑或線上 URL。
@@ -82,25 +86,25 @@ def image_handler(input_path: str):
     """
     try:
         if input_path.startswith(("http://", "https://")):
-            print(f"正在從 URL 下載圖片: {input_path}")
+            logger.info(f"正在從 URL 下載圖片: {input_path}")
             response = requests.get(input_path, stream=True)
             response.raise_for_status()
             image_data = io.BytesIO(response.content)
             image = Image.open(image_data).convert("RGBA")
             return image
         else:
-            print(f"正在讀取本地圖片: {input_path}")
+            logger.info(f"正在讀取本地圖片: {input_path}")
             image = Image.open(input_path).convert("RGBA")
             return image
 
     except FileNotFoundError:
-        print(f"錯誤：找不到指定的本地圖片 '{input_path}'。")
+        logger.error(f"錯誤：找不到指定的本地圖片 '{input_path}'。")
         return None
     except requests.exceptions.RequestException as e:
-        print(f"錯誤：下載圖片時發生網路錯誤: {e}")
+        logger.error(f"錯誤：下載圖片時發生網路錯誤: {e}")
         return None
     except Exception as e:
-        print(f"讀取或處理圖片 '{input_path}' 時發生錯誤: {e}")
+        logger.error(f"讀取或處理圖片 '{input_path}' 時發生錯誤: {e}")
         return None
 
 
@@ -136,10 +140,10 @@ def create_composite_image(
     try:
         user_image = image_handler(input_path)
     except FileNotFoundError:
-        print(f"錯誤：找不到指定的輸入圖片 '{input_path}'。")
+        logger.error(f"錯誤：找不到指定的輸入圖片 '{input_path}'。")
         return
     except Exception as e:
-        print(f"讀取圖片時發生錯誤: {e}")
+        logger.error(f"讀取圖片時發生錯誤: {e}")
         return
 
     canvas_width, canvas_height = canvas_size
@@ -169,8 +173,7 @@ def create_composite_image(
     mask_radius = vignette_mask_info["radius"]
     mask_start_ratio = vignette_mask_info["start_ratio"]
 
-    print(f"正在生成中心點在 {mask_center}，半徑為 {mask_radius}px 的蒙版...")
-    print(f"漸變效果將在半徑的 {mask_start_ratio*100:.0f}% 處開始。")
+    logger.info(f"正在生成蒙版")
     vignette_mask = create_black_mask(
         width=canvas_width,
         height=canvas_height,
@@ -178,8 +181,6 @@ def create_composite_image(
         max_radius=mask_radius,
         gradient_start_ratio=mask_start_ratio,
     )
-
-    print("正在疊加蒙版...")
     final_image = Image.alpha_composite(background_canvas, vignette_mask)
     return final_image
 
@@ -336,7 +337,7 @@ def create_quote_image(
     try:
         base_img.save(output_path, format="PNG")
     except Exception as e:
-        print(f"儲存圖片 '{output_path}' 時發生錯誤: {e}")
+        logger.error(f"儲存圖片 '{output_path}' 時發生錯誤: {e}")
         return None
 
 
@@ -349,7 +350,7 @@ class MIQ:
         quote_context="引言的內容",
         author_member="引言的作者",
         author_text="引言的作者(非成員)",
-        custom_image="上傳自訂背景圖 (可選)",
+        custom_avatar="上傳自訂作者頭像 (可選)",
     )
     async def make_it_a_quote(
         self,
@@ -357,32 +358,36 @@ class MIQ:
         quote_context: str,
         author_member: discord.Member = None,
         author_text: str = None,
-        custom_image: discord.Attachment = None,
+        custom_avatar: discord.Attachment = None,
     ):
         author_info = ""
-        if author_member is None and author_text is None:
-            author_info = "No_name"
-        elif author_text is None:
+        if author_member:
             author_info = f"{author_member.display_name}\n{author_member.global_name}"
-        else:
+        elif author_text:
             author_info = author_text
+        else:
+            author_info = "Anonymous"
 
         await itat.response.defer(thinking=True)
         output_filename = f"quote_{itat.id}.png"
 
         image_url = ""
-        if custom_image:
-            if custom_image.content_type and "image" in custom_image.content_type:
-                image_url = custom_image.url
+        if custom_avatar:
+            if custom_avatar.content_type and "image" in custom_avatar.content_type:
+                image_url = custom_avatar.url
             else:
                 await itat.followup.send(
                     "請上傳有效的圖片檔案 (例如 .png, .jpg)。", ephemeral=True
                 )
                 return
-        else:
+        elif author_member:
             image_url = (
-                author_member.avatar.url if author_member else DISCORD_DEFAULT_AVATAR
+                author_member.display_avatar.url
+                if author_member.display_avatar
+                else DISCORD_DEFAULT_AVATAR
             )
+        else:
+            image_url = DEFAULT_AVATAR
 
         try:
             create_quote_image(
@@ -398,7 +403,7 @@ class MIQ:
             )
 
         except Exception as e:
-            print(f"執行 /quote 指令時發生未預期錯誤: {e}")
+            logger.error(f"執行 miq 指令時發生未預期錯誤: {e}")
             await itat.followup.send("執行指令時發生內部錯誤", ephemeral=True)
         finally:
             if os.path.exists(output_filename):
