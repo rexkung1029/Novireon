@@ -68,7 +68,6 @@ def get_source_name(url):
     if not isinstance(url, str):
         return ""
     hostname = urllib.parse.urlparse(url).hostname
-    print(hostname)
     if hostname:
         if "youtube.com" in hostname or "youtu.be" in hostname:
             return "youtube"

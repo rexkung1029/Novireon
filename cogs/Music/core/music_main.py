@@ -1,3 +1,4 @@
+import asyncio
 import discord
 import logging
 import os
@@ -78,7 +79,7 @@ class Music(commands.Cog):
 
             match music_utils.get_source_name(request):
                 case "youtube":
-                    data = await Youtube.get_data(request)
+                    data = await Youtube.get_data_from_single(request)
                 case "monster_siren":
                     data = Monster_siren.get_song_data(request)
                 case "":
@@ -108,15 +109,95 @@ class Music(commands.Cog):
             else:
                 embed = discord.Embed(
                     color=0x28FF28,
-                    title=f"加入佇列: {title}",
+                    title=f"加入佇列:\n{title}",
                     description=f"by {author}",
                 )
-                embed.set_thumbnail(url=thumbnail)
                 embed.add_field(name="時長", value=music_utils.format_time(duration))
-                await itat.followup.send(embed=embed)
+                user = itat.user.nick if itat.user.nick else itat.user.name
+                embed.add_field(name="\u200b", value=f"由{user}加入")
+                embed.set_thumbnail(url=thumbnail)
+                await itat.channel.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Command_play Error {e}")
+            await itat.followup.send("執行指令時發生錯誤，請稍後再試。", ephemeral=True)
+
+    @app_commands.command(name="play_playlist", description="播放播放列表")
+    @Checkers.is_in_valid_voice_channel()
+    @app_commands.describe(
+        request="僅可使用youtube網址", max_results="最多加入幾首歌，預設5，最多25"
+    )
+    async def command_play_playlist(
+        self, itat: Itat, request: str, max_results: int = 5
+    ):
+        try:
+            await itat.response.send_message("處理中", ephemeral=True)
+
+            if itat.user.voice is None:
+                await itat.followup.send(
+                    "您必須先加入一個語音頻道才能使用此指令！",
+                    ephemeral=True,
+                    delete_after=5,
+                )
+                return
+
+            guild_id = itat.guild_id
+
+            if guild_id not in voice_data:
+                voice_data[guild_id] = {}
+                music_utils.return_to_default_music_settings(guild_id)
+
+            elif "client" in voice_data[guild_id]:
+                voice_client: VC = voice_data[guild_id]["client"]
+                if itat.user.voice.channel.id != voice_client.channel.id:
+                    await itat.followup.send(
+                        "您必須先加入與機器人相同語音頻道才能使用此指令！",
+                        ephemeral=True,
+                        delete_after=5,
+                    )
+                    return
+
+            voice_data[guild_id]["music_channel"] = itat.channel
+            voice_data[guild_id]["itat"] = itat
+
+            datas = await Youtube.get_data_from_list(request, max_results)
+            if datas is None:
+                await itat.followup.send(
+                    "找不到相關的播放列表，請嘗試其他關鍵字或網址", ephemeral=True
+                )
+                return
+            else:
+                user = itat.user.nick if itat.user.nick else itat.user.name
+                for data in datas:
+                    db_handler.append(
+                        query={"_id": guild_id}, field="queue", value=data
+                    )
+                    title = data.get("title", "Unknown Title")
+                    thumbnail = data.get("thumbnail", "")
+                    duration = data.get("duration", 0)
+                    author = data.get("author", "Unknown Artist")
+
+                    embed = discord.Embed(
+                        color=0x28FF28,
+                        title=f"加入佇列:\n{title}",
+                        description=f"by {author}",
+                    )
+                    embed.add_field(
+                        name="時長", value=music_utils.format_time(duration)
+                    )
+                    embed.add_field(name="\u200b", value=f"由{user}加入")
+                    embed.set_thumbnail(url=thumbnail)
+                    await itat.channel.send(embed=embed)
+                    await asyncio.sleep(1)
+
+            if ("client" not in voice_data[guild_id]) or (
+                not voice_data[guild_id]["client"].is_connected()
+            ):
+                await itat.followup.send("正在處理播放請求", ephemeral=True)
+                await Functions._play(guild_id)
+
+        except Exception as e:
+            logger.error(f"Command_play_playlist Error {e}")
             await itat.followup.send("執行指令時發生錯誤，請稍後再試。", ephemeral=True)
 
     @app_commands.command(name="stop", description="停止播放音樂")

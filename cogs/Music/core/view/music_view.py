@@ -39,9 +39,9 @@ class Views:
             self.guild_id = guild_id
 
         async def callback(self, itat: discord.Interaction):
-            if not Checkers._is_dj(itat) or not Checkers._is_in_valid_voice_channel(
+            if not Checkers._is_dj(
                 itat
-            ):
+            ) or not await Checkers._is_in_valid_voice_channel(itat):
                 await itat.response.send_message(
                     "你沒有足夠的權限", ephemeral=True, delete_after=5
                 )
@@ -61,9 +61,9 @@ class Views:
             self.guild_id = guild_id
 
         async def callback(self, itat: discord.Interaction):
-            if not Checkers._is_dj(itat) or not Checkers._is_in_valid_voice_channel(
+            if not Checkers._is_dj(
                 itat
-            ):
+            ) or not await Checkers._is_in_valid_voice_channel(itat):
                 await itat.response.send_message(
                     "你沒有足夠的權限", ephemeral=True, delete_after=5
                 )
@@ -80,9 +80,9 @@ class Views:
             self.guild_id = guild_id
 
         async def callback(self, itat: discord.Interaction):
-            if not Checkers._is_dj(itat) or not Checkers._is_in_valid_voice_channel(
+            if not Checkers._is_dj(
                 itat
-            ):
+            ) or not await Checkers._is_in_valid_voice_channel(itat):
                 await itat.response.send_message(
                     "你沒有足夠的權限", ephemeral=True, delete_after=5
                 )

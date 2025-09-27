@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import re
+import random
 import os
 import yt_dlp
 
@@ -10,8 +10,6 @@ YOUTUBE_API_KEY = os.getenv("GOOGLE")
 
 youtube_base_url = "https://www.youtube.com/"
 youtube_watch_url = youtube_base_url + "watch?v="
-yt_dl_options = {"format": "bestaudio/best"}
-ytdl = yt_dlp.YoutubeDL(yt_dl_options)
 youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
 
 logging.basicConfig(level=logging.INFO)
@@ -19,10 +17,81 @@ logger = logging.getLogger("Youtube")
 
 
 class Youtube:
-    async def get_data(request):
-        vid = Youtube.get_youtube_video_id(request)
-        url = youtube_watch_url + vid
-        raw_data = await asyncio.to_thread(ytdl.extract_info, url=url, download=False)
+    @staticmethod
+    async def get_playlist_metadata(url: str):
+        """
+        從 YouTube URL 提取影片或播放列表的所有元數據，不進行下載。
+        """
+        yt_dl_options = {
+            "format": "bestaudio/best",
+            "extract_flat": True,
+            "noplaylist": False,
+            "force_noplaylist": False,
+            "source_address": "0.0.0.0",
+            "playlistend": 50,
+        }
+
+        ytdl = yt_dlp.YoutubeDL(yt_dl_options)
+
+        try:
+            logger.info(f"正在提取 URL 的元數據: {url}")
+            raw_data = await asyncio.to_thread(
+                ytdl.extract_info,
+                url=url,
+                download=False,
+            )
+
+            entries = []
+            if raw_data.get("_type") == "playlist":
+                entries = raw_data.get("entries", [])
+                logger.info(f"檢測到播放列表，共有 {len(entries)} 個條目。")
+            else:
+                entries = [raw_data]
+
+            playlist_metadata = []
+            for entry in entries:
+                if entry is None:
+                    continue
+                playlist_metadata.append(
+                    {
+                        "webpage_url": entry.get("webpage_url") or entry.get("url"),
+                    }
+                )
+            return playlist_metadata
+
+        except Exception as e:
+            logger.error(f"提取元數據時發生錯誤: {e}")
+            return None
+
+    @staticmethod
+    async def get_data_from_list(request: str, max_results: int) -> list[dict] | None:
+        playlist_metadata = await Youtube.get_playlist_metadata(request)
+
+        if not playlist_metadata:
+            logger.error("未能獲取播放列表元數據，無法進行下載。")
+            return
+        selected_songs = random.sample(
+            playlist_metadata,
+            min(max_results, len(playlist_metadata), 25),  # 確保不超過總數或 25
+        )
+        video_info = []
+        for song in selected_songs:
+            info = await Youtube.get_data_from_single(song["webpage_url"])
+            if info:
+                video_info.append(info)
+        return video_info
+
+    @staticmethod
+    async def get_data_from_single(request) -> dict:
+        yt_dl_options = {
+            "format": "bestaudio/best",
+            "noplaylist": True,
+            "forcenoplaylist": True,
+        }
+        ytdl = yt_dlp.YoutubeDL(yt_dl_options)
+        raw_data = await asyncio.to_thread(
+            ytdl.extract_info, url=request, download=False
+        )
         data = {
             "author": raw_data.get("uploader", "Unknown Artist"),
             "duration": raw_data["duration"],
@@ -32,23 +101,10 @@ class Youtube:
         }
         return data
 
-    def get_youtube_video_id(url: str) -> str | None:
-        if not isinstance(url, str):
-            return None
-
-        # 正規表示式，匹配各種 YouTube 網址格式
-        # 解說請見下方
-        regex_pattern = r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)?([a-zA-Z0-9_-]{11})"
-
-        match = re.search(regex_pattern, url)
-
-        if match:
-            return match.group(1)
-
-        return None
-
     @staticmethod
-    async def get_youtube_search_results(search_query: str, max_results: int = 10):
+    async def get_youtube_search_results(
+        search_query: str, max_results: int = 10
+    ) -> dict:
         try:
             loop = asyncio.get_event_loop()
             request = youtube.search().list(

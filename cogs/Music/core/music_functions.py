@@ -141,7 +141,7 @@ class Functions:
                 )
                 await music_channel.send("音樂已恢復播放", delete_after=5)
         except Exception as e:
-            print(f"resume command error: {e}")
+            logger.error(f"resume command error: {e}")
 
     async def _skip(guild_id):
         try:
@@ -171,10 +171,16 @@ class Functions:
         client: VC = voice_data[guild_id]["client"]
 
         if client.is_connected():
+            MongoCRUD.update_one(
+                db_handler,
+                query={"_id": guild_id},
+                new_values={"queue": [], "is_playing": False, "current_playing": None},
+                upsert=True,
+            )
             await client.disconnect(force=True)
-            await voice_data[guild_id]["music_channel"].send("已停止並斷開連接")
         await asyncio.sleep(1)
         if guild_id in voice_data:
+            await voice_data[guild_id]["music_channel"].send("已停止並斷開連接")
             del voice_data[guild_id]
 
     async def play_next(guild_id):
@@ -184,6 +190,11 @@ class Functions:
             embed = embed_msg.embeds.pop()
             embed.description = "播放完畢"
             await embed_msg.edit(embed=embed, view=None)
+            if (
+                db_handler.get(query={"_id": guild_id})[0].get("current_playing")
+                is None
+            ):
+                return
             queue = data.get("queue", None)
             db_handler.append(
                 query={"_id": guild_id},
@@ -253,7 +264,7 @@ class Functions:
                         future.set_result(song_data)
 
                 except Exception as e:
-                    print(f"search_callback error: {e}")
+                    logger.error(f"search_callback error: {e}")
 
             search_menu.callback = search_menu_callback
 
@@ -276,7 +287,6 @@ class Functions:
                     break
 
                 client: VC = voice_data[guild_id]["client"]
-                data = db_handler.get(query={"_id": guild_id})[0]
                 human_members = [
                     member for member in client.channel.members if not member.bot
                 ]
@@ -293,6 +303,11 @@ class Functions:
                 )
 
                 if embed_msg:
+                    if len(embed_msg.embeds) == 0:
+                        logger.warning(
+                            f"Embed message has no embeds for guild {guild_id}."
+                        )
+                        break
                     embed = embed_msg.embeds[0]
                     new_progress_bar = music_utils.generate_progress_bar(guild_id)
                     if embed.description != new_progress_bar:

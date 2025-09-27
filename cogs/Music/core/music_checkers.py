@@ -26,9 +26,14 @@ db_handler = MongoCRUD(
 
 class Checkers:
     @staticmethod
-    def _is_in_valid_voice_channel(itat: Itat):
+    async def _is_in_valid_voice_channel(itat: Itat):
         guild_id = itat.guild_id
         if itat.user.voice is None:
+            await itat.followup.send(
+                "您必須先加入一個語音頻道才能使用此指令！",
+                ephemeral=True,
+                delete_after=5,
+            )
             return False
         if guild_id not in voice_data:
             return True
