@@ -87,6 +87,7 @@ class Youtube:
             "format": "bestaudio/best",
             "noplaylist": True,
             "forcenoplaylist": True,
+            "ignoreerrors": True,
         }
         ytdl = yt_dlp.YoutubeDL(yt_dl_options)
         raw_data = await asyncio.to_thread(
