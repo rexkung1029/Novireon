@@ -18,6 +18,7 @@ from Novireon.cogs.Player.core import utils
 from Novireon.cogs.Player.data import voice_data
 from Novireon.cogs.Player.core.view.control_views import ControlView
 from Novireon.src.util.config import get_config
+from Novireon.cogs.Player.core.request_manager import RequestManager
 
 logger = logging.getLogger("player.functions")
 logger.setLevel(logging.INFO)
@@ -55,7 +56,13 @@ db_handler = MongoCRUD(
 
 
 class Functions:
+
+    @staticmethod
     async def _pause(guild_id):
+        await RequestManager.request_op(guild_id, "pause", Functions._pause_op, guild_id)
+
+    @staticmethod
+    async def _pause_op(guild_id):
         try:
             client: VC = voice_data[guild_id].get("client")
             data = db_handler.get(query={"_id": guild_id})[0]
@@ -70,11 +77,10 @@ class Functions:
         except Exception as e:
             logger.error(f"pause command error: {e}")
 
+    @staticmethod
     async def pre_play(itat: Itat, request):
         guild_id = itat.guild_id
-        if guild_id not in voice_data:
-            voice_data[guild_id] = {}
-            utils.return_to_default_player_settings(guild_id)
+        RequestManager.ensure_worker(guild_id)
 
         voice_data[guild_id]["player_channel"] = itat.channel
         voice_data[guild_id]["itat"] = itat
@@ -119,22 +125,29 @@ class Functions:
                     pass
             case _:
                 pass
+
         user = itat.user.nick if itat.user.nick else itat.user.name
         if data is None:
             await itat.followup.send("找不到相關的音樂，請嘗試其他關鍵字或網址", ephemeral=True)
             return
         else:
             data.update({"requester": user})
-            db_handler.append(query={"_id": guild_id}, field="queue", value=data)
+            await RequestManager.request_op(
+                guild_id, "play_resolved", Functions._play_resolved_op, guild_id, itat, data
+            )
+
+    @staticmethod
+    async def _play_resolved_op(guild_id, itat: Itat, data):
+        db_handler.append(query={"_id": guild_id}, field="queue", value=data)
 
         if ("client" not in voice_data[guild_id]) or (not voice_data[guild_id]["client"].is_connected()):
             await itat.followup.send("正在處理播放請求", ephemeral=True)
             await Functions._play(guild_id)
-
         else:
             embed = utils.create_queue_embed(data)
             await itat.channel.send(embed=embed)
 
+    @staticmethod
     async def pre_play_playlist(itat: Itat, request, max_results, if_shuffle):
         if max_results < 1:
             max_results = 1
@@ -144,9 +157,7 @@ class Functions:
         await itat.response.send_message("處理中", ephemeral=True)
 
         guild_id = itat.guild_id
-        if guild_id not in voice_data:
-            voice_data[guild_id] = {}
-            utils.return_to_default_player_settings(guild_id)
+        RequestManager.ensure_worker(guild_id)
 
         voice_data[guild_id]["player_channel"] = itat.channel
         voice_data[guild_id]["itat"] = itat
@@ -155,23 +166,25 @@ class Functions:
         if metadatas is None:
             await itat.followup.send("找不到相關的播放列表，請嘗試其他關鍵字或網址", ephemeral=True)
             return
+
         max_songs_count = min(
             max_results,
             len(metadatas),
             player_config["limits.max_song_count_add_via_playlist"],
         )
         if if_shuffle:
-            selected_songs = random.sample(
-                metadatas,
-                max_songs_count,
-            )
+            selected_songs = random.sample(metadatas, max_songs_count)
         else:
             selected_songs = metadatas[:max_songs_count]
 
         user = itat.user.nick if itat.user.nick else itat.user.name
         for song in selected_songs:
+            if guild_id in voice_data and voice_data[guild_id].get("is_stopped"):
+                break
             try:
                 data = await Youtube.get_data_from_single(song["webpage_url"])
+                if guild_id not in voice_data or voice_data[guild_id].get("is_stopped"):
+                    break
                 data.update({"requester": user})
                 db_handler.append(query={"_id": guild_id}, field="queue", value=data)
                 embed = utils.create_queue_embed(data)
@@ -182,10 +195,16 @@ class Functions:
                 logger.error(f"Error adding song from playlist: {e}")
                 continue
 
+        if guild_id in voice_data and not voice_data[guild_id].get("is_stopped"):
+            await RequestManager.request_op(guild_id, "start_play", Functions._start_play_op, guild_id, itat)
+
+    @staticmethod
+    async def _start_play_op(guild_id, itat: Itat):
         if ("client" not in voice_data[guild_id]) or (not voice_data[guild_id]["client"].is_connected()):
             await itat.followup.send("正在處理播放請求", ephemeral=True)
             await Functions._play(guild_id)
 
+    @staticmethod
     async def _play(guild_id):
         try:
             loop = asyncio.get_event_loop()
@@ -194,11 +213,14 @@ class Functions:
             def after_play(error):
                 if error:
                     logger.info(f"Player error: {error}")
-                future = asyncio.run_coroutine_threadsafe(Functions.play_next(guild_id), loop)
-                try:
-                    future.result()
-                except Exception as e:
-                    logger.error(f"Error in after_play callback: {e}")
+                if guild_id in voice_data and not voice_data[guild_id].get("is_stopped"):
+                    future = asyncio.run_coroutine_threadsafe(
+                        RequestManager.request_op(guild_id, "play_next", Functions._play_next_op, guild_id), loop
+                    )
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logger.error(f"Error in after_play callback: {e}")
 
             next_song_data = db_handler.pop(query={"_id": guild_id}, field="queue")
 
@@ -256,14 +278,25 @@ class Functions:
                 upsert=True,
             )
 
+            if "playback_state_updater" in voice_data[guild_id]:
+                try:
+                    voice_data[guild_id]["playback_state_updater"].cancel()
+                except Exception:
+                    pass
             voice_data[guild_id]["playback_state_updater"] = asyncio.create_task(
                 Functions.playback_state_updater(guild_id)
             )
         except Exception as e:
-            await voice_data[guild_id]["player_channel"].send("無法播放，請使用連結或再試一次", delete_after=10)
+            if guild_id in voice_data and "player_channel" in voice_data[guild_id]:
+                await voice_data[guild_id]["player_channel"].send("無法播放，請使用連結或再試一次", delete_after=10)
             logger.error(f"_play error: {e}")
 
+    @staticmethod
     async def _resume(guild_id):
+        await RequestManager.request_op(guild_id, "resume", Functions._resume_op, guild_id)
+
+    @staticmethod
+    async def _resume_op(guild_id):
         try:
             client: VC = voice_data[guild_id].get("client")
             data = db_handler.get(query={"_id": guild_id})[0]
@@ -285,7 +318,12 @@ class Functions:
         except Exception as e:
             logger.error(f"resume command error: {e}")
 
+    @staticmethod
     async def _skip(guild_id):
+        await RequestManager.request_op(guild_id, "skip", Functions._skip_op, guild_id)
+
+    @staticmethod
+    async def _skip_op(guild_id):
         try:
             client: VC = voice_data[guild_id].get("client")
             data = db_handler.get(query={"_id": guild_id})[0]
@@ -293,69 +331,96 @@ class Functions:
             if client and data.get("is_playing"):
                 client.stop()
             else:
-                await player_channel.send("沒有正在播放的音樂", delete_after=5)
+                if player_channel:
+                    await player_channel.send("沒有正在播放的音樂", delete_after=5)
         except Exception as e:
-            await player_channel.send("播放下一首時出現問題", delete_after=10)
-            await Functions._stop(guild_id)
+            player_channel = voice_data[guild_id].get("player_channel")
+            if player_channel:
+                await player_channel.send("播放下一首時出現問題", delete_after=10)
+            await Functions._stop_op(guild_id)
             logger.error(f"skip command error: {e}")
 
+    @staticmethod
     async def _stop(guild_id):
+        await RequestManager.request_op(guild_id, "stop", Functions._stop_op, guild_id)
+
+    @staticmethod
+    async def _stop_op(guild_id):
         try:
             if guild_id not in voice_data:
                 return
 
-            if "playback_state_updater" not in voice_data[guild_id]:
-                return
+            voice_data[guild_id]["is_stopped"] = True
 
-            if "client" not in voice_data[guild_id]:
-                return
+            if "playback_state_updater" in voice_data[guild_id]:
+                try:
+                    voice_data[guild_id]["playback_state_updater"].cancel()
+                except Exception:
+                    pass
 
-            voice_data[guild_id]["playback_state_updater"].cancel()
-            client: VC = voice_data[guild_id]["client"]
+            if "client" in voice_data[guild_id]:
+                client: VC = voice_data[guild_id]["client"]
+                if client.is_connected():
+                    utils.return_to_default_player_settings(guild_id)
+                    await client.disconnect(force=True)
+                    await asyncio.sleep(1)
 
-            if client.is_connected():
-                utils.return_to_default_player_settings(guild_id)
-                await client.disconnect(force=True)
-                await asyncio.sleep(1)
-                if "player_channel" in voice_data[guild_id]:
+            if "player_channel" in voice_data[guild_id]:
+                try:
                     await voice_data[guild_id]["player_channel"].send("已停止並斷開連接")
-                    del voice_data[guild_id]
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"stop error: {e}")
 
+    @staticmethod
     async def play_next(guild_id):
+        await RequestManager.request_op(guild_id, "play_next", Functions._play_next_op, guild_id)
+
+    @staticmethod
+    async def _play_next_op(guild_id):
         try:
             data = db_handler.get(query={"_id": guild_id})[0]
             current_playing = data.get("current_playing", None)
-            embed_msg: discord.Message = voice_data[guild_id]["state_embed_message"]
-            embed = embed_msg.embeds.pop()
-            embed.description = "播放完畢"
-            await embed_msg.edit(embed=embed, view=None)
+            embed_msg: discord.Message = voice_data[guild_id].get("state_embed_message")
+            if embed_msg:
+                try:
+                    embed = embed_msg.embeds.pop()
+                    embed.description = "播放完畢"
+                    await embed_msg.edit(embed=embed, view=None)
+                except Exception:
+                    pass
             if current_playing is None:
                 return
             queue = data.get("queue", None)
             try:
                 if not current_playing.get("is_live", False):
-                    current_playing = {
+                    current_playing_history = {
                         "author": current_playing.get("author"),
                         "title": current_playing.get("title"),
                     }
                     db_handler.append(
                         query={"_id": guild_id},
                         field="played",
-                        value=current_playing,
+                        value=current_playing_history,
                     )
             except:
                 pass
-            if len(queue) > 0:
+            if queue and len(queue) > 0:
                 await Functions._play(guild_id)
             else:
-                await Functions._stop(guild_id)
+                await Functions._stop_op(guild_id)
         except Exception as e:
             logger.error(f"play_next error: {e}")
-            await Functions._stop(guild_id)
-            await voice_data[guild_id]["player_channel"].send("播放下一首時出現問題", delete_after=10)
+            await Functions._stop_op(guild_id)
+            player_channel = voice_data[guild_id].get("player_channel")
+            if player_channel:
+                try:
+                    await player_channel.send("播放下一首時出現問題", delete_after=10)
+                except Exception:
+                    pass
 
+    @staticmethod
     async def search(itat: Itat, request, region="youtube"):
         try:
             await itat.followup.send(f"正在搜尋: `{request}`...", ephemeral=True)
@@ -421,6 +486,7 @@ class Functions:
             logger.error(f"search error: {e}")
             await itat.followup.send("搜尋時發生錯誤，請使用有效連結或再試一次。", ephemeral=True)
 
+    @staticmethod
     async def playback_state_updater(guild_id):
         try:
             while guild_id in voice_data:
@@ -457,9 +523,12 @@ class Functions:
                 if guild_data:
                     embed_msg = guild_data.get("embed_msg")
                     if embed_msg:
-                        embed = embed_msg.embeds[0]
-                        embed.description = "播放完畢"
-                        await embed_msg.edit(embed=embed, view=None)
+                        try:
+                            embed = embed_msg.embeds[0]
+                            embed.description = "播放完畢"
+                            await embed_msg.edit(embed=embed, view=None)
+                        except Exception:
+                            pass
 
         except Exception as e:
             logger.error(f"update_progress_bar encountered a fatal error: {e}")
