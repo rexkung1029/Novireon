@@ -1,95 +1,117 @@
-# Novireon
+# Novireon Discord Bot
 
-Novireon is a versatile Discord bot built with `discord.py`, designed to enhance your server with a range of features from music playback to detailed server event logging. It uses MongoDB for persistent data storage, ensuring settings and queues are saved across sessions.
+
+Novireon is a highly capable and versatile Discord bot built with `discord.py`. It is designed to enhance your server experience with a rich set of features including advanced music playback, comprehensive event logging, dynamic image generation, and robust server utilities. 
+
+By leveraging **MongoDB** for persistent data storage and a robust background worker architecture for thread-safe command execution, Novireon ensures a seamless, lag-free, and crash-resistant experience.
+
+---
 
 ## Features
 
-*   **🎵 Advanced Player System:**
-    *   Play music from YouTube (single videos and playlists) and Monster Siren (Arknights music).
-    *   Robust queue system managed in a MongoDB database.
-    *   Interactive playback controls (pause, resume, skip, stop) via slash commands and buttons.
-    *   Real-time playback progress bar that updates automatically.
-    *   Configurable DJ role for managing music playback permissions.
+### Advanced Music Player System
+- **Multi-Source Support:** Play music from **YouTube** (single videos, search queries, and playlists), **Spotify** (automatically searches YouTube equivalents), and **Monster Siren** (Arknights OST).
+- **Thread-Safe Queue (New!)**: Built on a highly robust asynchronous background worker (`RequestManager`). Ensures that multiple playback requests, skips, or stops are queued sequentially per server, completely preventing race conditions and playback overlapping.
+- **Persistent Data:** Queues and playback states are managed via a MongoDB database, allowing the bot to maintain states smoothly.
+- **Interactive UI:** Playback controls (pause, resume, skip, stop) are presented via intuitive Discord UI buttons.
+- **Live Progress Bar:** The playback embed features a real-time progress bar that dynamically updates.
+- **DJ Role:** Configurable DJ roles to restrict music playback commands to authorized members.
 
-*   **✍️ Comprehensive Server Logging:**
-    *   Logs a wide variety of server events to designated channels.
-    *   Tracks message edits and deletions.
-    *   Monitors member updates including nickname changes, role assignments, avatar updates, and username changes.
-    *   Highly configurable: enable/disable logging globally, set specific channels for different event types (e.g., members, messages), and ignore specific channels.
+### Comprehensive Server Logging
+- **Event Tracking:** Keep track of important server events, logging them to designated channels.
+- **Message Monitoring:** Logs message edits and deletions for auditing.
+- **Member Activity:** Tracks nickname changes, role updates, avatar changes, and username modifications.
+- **Highly Configurable:** Easily toggle logging globally, set specific channels for different logs (e.g., messages vs. member updates), or completely ignore noisy channels.
 
-*   **🖼️ Quote Image Generator:**
-    *   Create stylish quote images using the `/make_it_a_quote` command.
-    *   Generates a visually appealing image with the quote, author's name, and avatar (from a Discord member, custom upload, or default).
+### Quote Image Generator (`/make_it_a_quote`)
+- Generate aesthetic and stylish quote images from any context.
+- Customizations include attributing the quote to a tagged member, custom text, and custom avatars.
+- Powered by `Pillow` for high-quality rendering.
 
-*   **⚙️ Utility Commands:**
-    *   A detailed `/ping` command that provides real-time stats on API latency, host server CPU/memory usage, and bot process information.
+### Utility & Admin Commands
+- **Ping & Stats:** Detailed `/ping` command providing real-time API latency, host machine CPU/Memory usage, and bot process diagnostics.
+- **Channel Binding:** Bind the bot to specific text channels for music commands to keep your server tidy.
+
+---
 
 ## Setup and Installation
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/rexkung1029/Novireon.git
-    cd Novireon
-    ```
+### 1. Prerequisites
+- **Python 3.10+** (up to 3.13 supported)
+- **MongoDB** instance (Local or Atlas)
+- **FFmpeg** (installed and added to your system PATH for music playback)
 
-2.  **Install dependencies:**
-    This project uses `uv` for package management. You can install the dependencies from the `pyproject.toml` file.
-    ```bash
-    pip install uv
-    uv pip install -r requirements.txt
-    ```
-    Alternatively, you can install the dependencies manually using pip:
-    ```bash
-    pip install discord.py google-api-python-client motor pillow psutil pydub pymongo pynacl python-dotenv pytz requests soundfile yt-dlp
-    ```
+### 2. Clone the Repository
+```bash
+git clone https://github.com/rexkung1029/Novireon.git
+cd Novireon
+```
 
-3.  **Configure Environment Variables:**
-    Create a `.env` file in the root directory and add the following variables:
-    ```env
-    DISCORD=YOUR_DISCORD_BOT_TOKEN
-    MONGO_URI=YOUR_MONGODB_CONNECTION_STRING
-    ```
-    *   `DISCORD`: Your Discord bot's token.
-    *   `MONGO_URI`: Your connection string for a MongoDB database.
+### 3. Install Dependencies
+This project uses [uv](https://github.com/astral-sh/uv) for lightning-fast package management, as defined in `pyproject.toml`.
 
-4.  **Run the bot:**
-    ```bash
-    python bot.py
-    ```
-    The bot will log in, sync its slash commands, and become operational.
+```bash
+# Install uv if you haven't already
+pip install uv
 
-## Command Usage
+# Install dependencies using uv
+uv pip install -r pyproject.toml
+```
+*(Alternatively, you can manually install the dependencies via `pip install -r requirements.txt` if available, or by checking `pyproject.toml` dependencies list).*
 
-All commands are implemented as slash commands for easy use.
+### 4. Configuration
+Create a `.env` file in the root directory and configure the following variables:
+
+```env
+DISCORD=YOUR_DISCORD_BOT_TOKEN
+MONGO_URI=YOUR_MONGODB_CONNECTION_STRING
+```
+Additionally, the bot uses `toml` files for configuration. You can find and tweak these files in the `Novireon/config/` directory (e.g., `Player_config.toml`, `MIQ_config.toml`).
+
+### 5. Run the Bot
+To start the bot, run the main entry point:
+```bash
+python start.py
+```
+The bot will initialize its background tasks, sync slash commands with Discord, and output a confirmation log once it is ready.
+
+---
+
+## Command Reference
+
+All commands are implemented as modern **Slash Commands** (`/`).
 
 ### Player Commands
+- `/player play <request>`: Search and play a song from YouTube, Spotify, or Monster Siren.
+- `/player play_playlist <request> [max_results]`: Loads up to 25 songs from a playlist.
+- `/player pause`: Pauses the current track.
+- `/player resume`: Resumes the paused track.
+- `/player skip`: Votes/Forces a skip to the next track.
+- `/player stop`: Clears the queue, stops playback, and disconnects the bot.
 
-*   `/player play <request>`: Plays a song. The request can be a YouTube/Monster Siren URL or a search query.
-*   `/player play_playlist <request> [max_results]`: Adds a random selection of songs from a YouTube playlist to the queue. `max_results` defaults to 5, with a maximum of 25.
-*   `/player pause`: Pauses the current song.
-*   `/player resume`: Resumes playback.
-*   `/player skip`: Skips to the next song in the queue.
-*   `/player stop`: Stops playback, clears the queue, and disconnects the bot.
+### Player Setup (Admin/DJ)
+- `/player_setup dj_role [role]`: Designates a role as the DJ. Only DJs can control playback if set.
+- `/player_setup channel [channel]`: Binds music commands to a specific text channel.
 
-### Player Setup (Admin/DJ Permissions)
+### Server Logger (Admin)
+- `/server_logger toggle`: Turns logging features on or off.
+- `/server_logger list_settings`: Displays the current server logging configuration.
+- `/server_logger set_log_channel <channel> <logging_type>`: Binds specific log events (e.g., messages, members) to a channel.
+- `/server_logger ignore_channel <channel>`: Ignores a specific channel from being logged.
 
-*   `/player_setup dj_role [role]`: Sets a "DJ" role that can control music playback. If no role is provided, the DJ role is cleared.
-*   `/player_setup channel [channel]`: Designates a specific text channel for music commands.
+### Utilities
+- `/ping`: Displays bot latency, CPU/RAM usage, and uptime.
+- `/make_it_a_quote <quote_context> [author] [avatar]`: Turns a memorable phrase into a beautifully formatted image quote.
 
-### Server Logger (Admin Permissions)
+---
 
-*   `/server_logger toggle`: Toggles server logging on or off.
-*   `/server_logger list_settings`: Displays the current logging configuration.
-*   `/server_logger set_log_channel <channel> <logging_type>`: Sets the destination channel for a specific type of log (e.g., messages, members).
-*   `/server_logger ignore_channel <channel>`: Adds or removes a channel from the logging ignore list.
+## Architecture Highlights
+- **Request Manager (`queue_manager.py` / `request_manager.py`)**: A custom-built asynchronous queuing system that guarantees thread-safe, sequential processing of Discord audio operations. By decoupling network requests (like Spotify scraping) from state mutation, the bot remains incredibly responsive under heavy load.
+- **MongoDB State Management (`mongo_crud.py`)**: Ensures robust persistent storage for server settings and active queues.
 
-### Utility Commands
+---
 
-*   `/ping`: Shows an embed with detailed real-time status of the bot and its host server.
-*   `/make_it_a_quote <quote_context> [author_member] [author_text] [custom_avatar]`: Generates a quote image. You can specify the author by tagging a member or providing text, and optionally upload a custom avatar.
-
-## Credits
-
-### Fonts
-
-* gensen-font - Licensed under SIL Open Font License 1.1. (Copyright © 2020 ButTaiwan)
+## Credits & Licenses
+- **Fonts**: Uses *gensen-font* (Licensed under SIL Open Font License 1.1, Copyright © 2020 ButTaiwan).
+- **Core Library**: Powered by [discord.py](https://github.com/Rapptz/discord.py).
+- **gensen-font** - Licensed under SIL Open Font License 1.1. (Copyright © 2020 ButTaiwan)
