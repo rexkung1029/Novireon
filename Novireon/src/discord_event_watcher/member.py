@@ -38,3 +38,15 @@ class MemberWatcher:
             return
         server_logger_cog = self.bot.get_cog("ServerLogger")
         await server_logger_cog.user_event(before=before, after=after, event_type=event_type)
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member):
+        server_logger_cog = self.bot.get_cog("ServerLogger")
+        if server_logger_cog:
+            await server_logger_cog.join_leave_event(member=member, event_type="join")
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member: discord.Member):
+        server_logger_cog = self.bot.get_cog("ServerLogger")
+        if server_logger_cog:
+            await server_logger_cog.join_leave_event(member=member, event_type="leave")

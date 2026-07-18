@@ -209,7 +209,81 @@ class ServerLoggerMain:
         await channel.send(embed=embed, silent=True)
         return
 
-    async def get_logging_channel(self, guild_id: int, type: Literal["message", "member"]):
+    async def join_leave_event(self, member: Member, event_type: Literal["join", "leave"]):
+        guild_id = member.guild.id
+        if not is_logging_enabled(guild_id):
+            return
+        channel = await self.get_logging_channel(guild_id, "join/leave")
+        if not channel:
+            return
+        
+        embed = Embed()
+        embed.set_author(
+            icon_url=member.display_avatar.url,
+            name=member.display_name,
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        taipei_tz = pytz.timezone("Asia/Taipei")
+        current_time = datetime.now().timestamp()
+        
+        if event_type == "join":
+            embed.title = "成員加入"
+            embed.color = Color.green()
+            embed.add_field(name="帳號建立時間", value=member.created_at.astimezone(taipei_tz).strftime('%Y-%m-%d %H:%M:%S'), inline=False)
+        else:
+            embed.title = "成員離開"
+            embed.color = Color.red()
+            if member.joined_at:
+                embed.add_field(name="加入伺服器時間", value=member.joined_at.astimezone(taipei_tz).strftime('%Y-%m-%d %H:%M:%S'), inline=False)
+                
+        embed.set_footer(
+            text=f"Member ID: {member.id}\nEvent at {datetime.fromtimestamp(current_time,tz=taipei_tz).strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        await channel.send(embed=embed, silent=True)
+        return
+
+    async def voice_event(self, member: Member, before: discord.VoiceState, after: discord.VoiceState):
+        guild_id = member.guild.id
+        if not is_logging_enabled(guild_id):
+            return
+            
+        if before.channel == after.channel:
+            return
+            
+        channel = await self.get_logging_channel(guild_id, "voice")
+        if not channel:
+            return
+
+        embed = Embed()
+        embed.set_author(
+            icon_url=member.display_avatar.url,
+            name=member.display_name,
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+
+        if before.channel is None and after.channel is not None:
+            embed.title = "加入語音頻道"
+            embed.color = Color.green()
+            embed.add_field(name="頻道", value=after.channel.mention, inline=False)
+        elif before.channel is not None and after.channel is None:
+            embed.title = "離開語音頻道"
+            embed.color = Color.red()
+            embed.add_field(name="頻道", value=before.channel.mention, inline=False)
+        elif before.channel is not None and after.channel is not None:
+            embed.title = "切換語音頻道"
+            embed.color = Color.blue()
+            embed.add_field(name="從", value=before.channel.mention, inline=False)
+            embed.add_field(name="到", value=after.channel.mention, inline=False)
+
+        taipei_tz = pytz.timezone("Asia/Taipei")
+        current_time = datetime.now().timestamp()
+        embed.set_footer(
+            text=f"Member ID: {member.id}\nUpdated at {datetime.fromtimestamp(current_time,tz=taipei_tz).strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        await channel.send(embed=embed, silent=True)
+        return
+
+    async def get_logging_channel(self, guild_id: int, type: Literal["message", "member", "server", "voice", "join/leave"]):
         data = db_handler.get(query={"_id": guild_id})
         if not data:
             return
