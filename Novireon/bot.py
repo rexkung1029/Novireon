@@ -17,6 +17,12 @@ class Bot(commands.Bot):
     async def setup_hook(self):
         self.add_view(RoleGiverView())
 
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        if isinstance(error, commands.CommandNotFound):
+            return
+
+        await super().on_command_error(ctx, error)
+
 
 bot = Bot()
 
