@@ -31,17 +31,7 @@ ffmpeg_options = {
         "-analyzeduration 10M "
         "-fflags +genpts+igndts "
     ),
-    "options": (
-        "-vn "
-        "-threads auto "
-        '-af "volume=1.0" '
-        "-acodec libopus "
-        "-b:a 128k "
-        "-ar 48000 "
-        "-ac 2 "
-        "-application audio "
-        "-frame_duration 20 "
-    ),
+    "options": ("-vn " "-threads auto " '-af "volume=1.0" ' "-b:a 128k " "-application audio " "-frame_duration 20 "),
 }
 
 mongo_uri = os.getenv("MONGO_URI")
