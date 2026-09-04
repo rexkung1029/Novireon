@@ -40,6 +40,7 @@ By leveraging **MongoDB** for persistent data storage and a robust background wo
 - **Python 3.10+** (up to 3.13 supported)
 - **MongoDB** instance (Local or Atlas)
 - **FFmpeg** (installed and added to your system PATH for music playback)
+- **Deno** (`yt-dlp` now requires an external **JavaScript runtime**)
 
 ### 2. Clone the Repository
 ```bash
