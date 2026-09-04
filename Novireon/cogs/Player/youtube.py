@@ -24,6 +24,7 @@ class Youtube:
             "force_noplaylist": False,
             "source_address": "0.0.0.0",
             "playlistend": 50,
+            "cookiefile": "youtube_cookies.txt",
         }
 
         try:
